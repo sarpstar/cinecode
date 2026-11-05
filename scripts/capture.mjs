@@ -379,6 +379,8 @@ async function openPage(chromePath, url) {
     '--allow-file-access-from-files',
   ];
   if (process.platform === 'darwin') flags.push('--use-angle=metal');
+  // box patch: with no X/Wayland display (an ssh shell) Chrome headless finds no GL context; EGL reaches the GPU
+  else if (process.platform === 'linux' && !process.env.DISPLAY && !process.env.WAYLAND_DISPLAY) flags.push('--use-gl=angle', '--use-angle=gl-egl');
   flags.push(...extraFlags);
   const proc = spawn(chromePath, [...flags, url], { stdio: ['ignore', 'ignore', 'pipe'] });
   browsers.push(proc);
