@@ -116,11 +116,13 @@ def sheet(inp, out, say, every="2", cols="6"):
     label = (",drawtext=text='%{pts\\:hms}':x=6:y=6:fontsize=18:fontcolor=white:box=1:boxcolor=black@0.5"
              if has_drawtext() else "")
 
-    def build(lbl):
+    def build(lbl, vfr="-fps_mode"):               # ffmpeg before 5.1 only knows -vsync
         return ["-y", "-i", inp, "-vf", f"select='isnan(prev_selected_t)+gte(t-prev_selected_t\\,{every}-0.001)',"
-                f"scale=320:-2{lbl},tile={cols}x{rows}:padding=4:margin=4", "-fps_mode", "vfr", "-frames:v", "1",
+                f"scale=320:-2{lbl},tile={cols}x{rows}:padding=4:margin=4", vfr, "vfr", "-frames:v", "1",
                 "-update", "1", f"{out}/sheet.jpg"]
     rc, _, err = call(FF + build(label))
+    if rc and "fps_mode" in err:
+        rc, _, err = call(FF + build(label, "-vsync"))
     if rc and label:                             # a Windows ffmpeg can have drawtext but find no font: drop the label
         rc, _, err = call(FF + build(""))
     if rc:

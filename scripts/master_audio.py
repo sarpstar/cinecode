@@ -36,6 +36,10 @@ def last_json(text):
     return json.loads(blocks[-1])
 
 
+# alimiter gained its "latency" option in ffmpeg 5; older builds reject the whole filter graph with it
+LIMITER_LATENCY = "latency" in subprocess.run(["ffmpeg", "-hide_banner", "-h", "filter=alimiter"], capture_output=True, text=True).stdout
+
+
 def ebur128(path):
     err = run(["ffmpeg", "-hide_banner", "-nostdin", "-i", path, "-filter_complex", "ebur128=peak=true", "-f", "null", "-"])
     summary = err[err.rfind("Summary:"):]
@@ -84,7 +88,7 @@ def main():
         """Gain into a lookahead limiter; measured again, the gain still owed must fit under TP."""
         for _ in range(4):
             pre = (f"volume={gain:.2f}dB,alimiter=limit={10 ** (ceiling / 20):.4f}:attack=5:release=60:"
-                   f"level=0:latency=1,")
+                   f"level=0{':latency=1' if LIMITER_LATENCY else ''},")
             m = measure(pre)
             print(f"limit: +{gain:.2f} dB then a lookahead limiter at {ceiling:.1f} dBFS -> "
                   f"I={m['input_i']} LUFS  TP={m['input_tp']} dBTP  LRA={m['input_lra']} LU")

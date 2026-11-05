@@ -189,7 +189,7 @@ def do_action(args):
 def loudness(path, a, d, band=None):
     af = f"highpass=f={band[0]},highpass=f={band[0]},lowpass=f={band[1]},lowpass=f={band[1]}," if band else ""
     err = run(["ffmpeg", "-hide_banner", "-nostdin", "-ss", f"{a:.3f}", "-t", f"{d:.3f}", "-i", path,
-               "-vn", "-af", af + "ebur128=framelog=quiet,volumedetect", "-f", "null", "-"])
+               "-vn", "-af", af + "ebur128=framelog=-8,volumedetect", "-f", "null", "-"])
     lufs = re.findall(r"I:\s+(-?[\d.]+|-inf) LUFS", err)
     mean = re.search(r"mean_volume:\s*(-?[\d.]+|-inf) dB", err)
     to_f = lambda s: -120.0 if s in (None, "-inf") else float(s)
