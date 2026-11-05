@@ -19,7 +19,7 @@
 <p align="center">
   <a href="https://github.com/sarpstar/cinecode/actions/workflows/tests.yml"><img src="https://img.shields.io/github/actions/workflow/status/sarpstar/cinecode/tests.yml?branch=main&label=tests&style=flat-square" alt="tests"></a>
   <img src="https://img.shields.io/badge/license-MIT-C37232?style=flat-square" alt="license: MIT">
-  <img src="https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Cursor-1a1a1a?style=flat-square" alt="agents: Claude Code, Cursor">
+  <img src="https://img.shields.io/badge/agents-Claude%20Code%20%C2%B7%20Cursor%20%C2%B7%20Antigravity-1a1a1a?style=flat-square" alt="agents: Claude Code, Cursor, Antigravity">
   <img src="https://img.shields.io/badge/render-three.js%20%C2%B7%20ffmpeg-1a1a1a?style=flat-square" alt="render: three.js, ffmpeg">
 </p>
 
@@ -28,7 +28,7 @@
 </p>
 <p align="center"><sub>30 seconds from films made with cinecode. Every frame is rendered from code in headless Chrome.</sub></p>
 
-It runs inside **Claude Code** (desktop app, VS Code extension, terminal) or **Cursor**, on your own computer. No paid service is required; a narrator, only if you want one, uses your own Gemini key (it has a free tier), ElevenLabs, or a free Turkish voice.
+It runs inside **Claude Code** (desktop app, VS Code extension, terminal), **Cursor**, or **Antigravity**, on your own computer. No paid service is required; a narrator, only if you want one, uses your own Gemini key (it has a free tier), ElevenLabs, or a free Turkish voice.
 
 ## What you can make
 
@@ -149,7 +149,7 @@ Details: `references/purpose-cinematic.md`, `references/purpose-ad.md`, `referen
 
 ## Requirements
 
-- An AI coding agent that can run local tools: **Claude Code** (desktop app, VS Code extension or terminal) or **Cursor**. The regular chat at claude.ai cannot run tools on your computer; Claude Code can (ffmpeg, Chrome, the scripts).
+- An AI coding agent that can run local tools: **Claude Code** (desktop app, VS Code extension or terminal), **Cursor**, or **Antigravity**. The regular chat at claude.ai cannot run tools on your computer; Claude Code can (ffmpeg, Chrome, the scripts).
 - Node.js 22+, Python 3.9+, ffmpeg and Google Chrome (or Chromium / Edge); the agent installs what is missing, with your OK. Nothing else, on Windows either: the kit runs in Claude Code's own PowerShell, with no bash; Git is used only to install and update the kit, never to render. If the kit's guard does not run in a Claude Code session, the film's setup says GUARD OFF (the tests run on Windows and Linux on every push, and on macOS before each change; a whole film made on Windows is not tried yet). The hooks need a recent Claude Code (the exec-form hooks and `onFailure`, 2.1.295 or newer); on an older client the guard may not register and the film still runs.
 - A GPU that Chrome can use (any recent Mac, or a PC with a working graphics driver).
 - Disk space: Quick mode pipes frames straight into the MP4, so a few hundred MB is enough; Film mode needs a few GB per film while rendering.
@@ -202,6 +202,16 @@ git clone https://github.com/sarpstar/cinecode.git ~/.cursor/skills/cinecode
 ```
 
 Open an empty folder in Cursor, open the Agent chat and type the same sentence. The kit's own checks (`make.py`, `qc.py`) run the same; the guard hooks that stop a few mistakes as they happen (a script asked about before it is shown, a draft not shown, a stop right after an approval) run in Claude Code only.
+
+### 5. Antigravity
+
+In Antigravity's chat, ask for the same install into `~/.gemini/antigravity/skills/cinecode`, or:
+
+```bash
+git clone https://github.com/sarpstar/cinecode.git ~/.gemini/antigravity/skills/cinecode
+```
+
+Open an empty folder in Antigravity, open the chat and type the same sentence. Subagents (`invoke_subagent`) are supported natively for independent reviews and checks.
 
 ## Quick start
 
