@@ -36,6 +36,22 @@ def last_json(text):
     return json.loads(blocks[-1])
 
 
+def duration(path):
+    """Container duration in seconds, 0.0 when ffprobe cannot tell."""
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", path],
+                         capture_output=True, text=True).stdout.strip()
+    try:
+        return float(out)
+    except ValueError:
+        return 0.0
+
+
+def pad_to(seconds):
+    """apad with an end: an endless apad leaves -shortest to stop the encode, and some ffmpeg builds
+    (seen with 7.1 on Windows, video stream copied) never stop. Bounded by the picture's length it ends on its own."""
+    return f"apad=whole_dur={seconds:.3f}" if seconds > 0 else "apad"
+
+
 def ebur128(path):
     err = run(["ffmpeg", "-hide_banner", "-nostdin", "-i", path, "-filter_complex", "ebur128=peak=true", "-f", "null", "-"])
     summary = err[err.rfind("Summary:"):]
@@ -70,7 +86,8 @@ def main():
     if silent:                                                        # nothing to normalise: keep the length, say why
         if a.video:
             cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", a.video, "-i", a.mix, "-map", "0:v:0",
-                   "-map", "1:a:0", "-c:v", "copy", "-af", "apad", "-c:a", "aac", "-b:a", "128k", "-shortest", a.output]
+                   "-map", "1:a:0", "-c:v", "copy", "-af", pad_to(duration(a.video)), "-c:a", "aac", "-b:a", "128k",
+                   "-shortest", a.output]
         else:
             cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", a.mix, "-c:a", "pcm_s24le", a.output]
         subprocess.run(cmd, check=True)
@@ -104,13 +121,11 @@ def main():
               f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}:"
               f"linear=true:print_format=json")
         if a.video:
-            dur = lambda f: float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
-                                                  "csv=p=0", f], capture_output=True, text=True).stdout.strip() or 0)
-            vd, md = dur(a.video), dur(a.mix)
+            vd, md = duration(a.video), duration(a.mix)
             if attempt == 0 and abs(vd - md) > 0.1:
                 print(f"WARNING: the mix is {md:.2f} s and the picture {vd:.2f} s; the picture keeps its length "
                       f"({'silence pads the end' if md < vd else 'the audio is cut at the last frame'})")
-            af += ",apad"                            # the picture decides the length; a short mix never trims it
+            af += "," + pad_to(vd)                   # the picture decides the length; a short mix never trims it
             cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-y", "-i", a.video, "-i", a.mix, "-map", "0:v:0", "-map", "1:a:0",
                    "-c:v", "copy", "-af", af, "-c:a", "aac", "-b:a", "320k", "-ar", "48000", "-movflags", "+faststart",
                    "-shortest", a.output]
