@@ -58,6 +58,8 @@ def main():
     ceiling_check = a.TP if a.TP is not None else -1.0
     a.TP = a.TP if a.TP is not None else (-2.0 if a.video else -1.0)   # AAC encoding lifts true peak by ~0.5-0.7 dB
     target = f"I={a.I}:TP={a.TP}:LRA={a.LRA}"
+    dur = lambda f: float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
+                                          "csv=p=0", f], capture_output=True, text=True).stdout.strip() or 0)
     measure = lambda pre: last_json(run(["ffmpeg", "-hide_banner", "-nostdin", "-i", a.mix, "-af",
                                          f"{pre}loudnorm={target}:print_format=json", "-f", "null", "-"]))
     pre = ""
@@ -70,7 +72,8 @@ def main():
     if silent:                                                        # nothing to normalise: keep the length, say why
         if a.video:
             cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", a.video, "-i", a.mix, "-map", "0:v:0",
-                   "-map", "1:a:0", "-c:v", "copy", "-af", "apad", "-c:a", "aac", "-b:a", "128k", "-shortest", a.output]
+                   "-map", "1:a:0", "-c:v", "copy", "-af", "apad", "-c:a", "aac", "-b:a", "128k", "-shortest",
+                   "-t", f"{dur(a.video):.3f}", a.output]
         else:
             cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", a.mix, "-c:a", "pcm_s24le", a.output]
         subprocess.run(cmd, check=True)
@@ -104,8 +107,6 @@ def main():
               f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}:"
               f"linear=true:print_format=json")
         if a.video:
-            dur = lambda f: float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
-                                                  "csv=p=0", f], capture_output=True, text=True).stdout.strip() or 0)
             vd, md = dur(a.video), dur(a.mix)
             if attempt == 0 and abs(vd - md) > 0.1:
                 print(f"WARNING: the mix is {md:.2f} s and the picture {vd:.2f} s; the picture keeps its length "
@@ -113,7 +114,7 @@ def main():
             af += ",apad"                            # the picture decides the length; a short mix never trims it
             cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-y", "-i", a.video, "-i", a.mix, "-map", "0:v:0", "-map", "1:a:0",
                    "-c:v", "copy", "-af", af, "-c:a", "aac", "-b:a", "320k", "-ar", "48000", "-movflags", "+faststart",
-                   "-shortest", a.output]
+                   "-shortest", "-t", f"{vd:.3f}", a.output]
         else:
             cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-y", "-i", a.mix, "-af", af, "-ar", "48000",
                    "-c:a", "pcm_s24le", a.output]
