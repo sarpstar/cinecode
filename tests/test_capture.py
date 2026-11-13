@@ -221,6 +221,54 @@ class Browser(unittest.TestCase):
             server.server_close()
             worker.join(timeout=5)
 
+    def probe_page(self, path, tries):
+        """A page that tries each URL in `tries` and reports what it could read as qc lines."""
+        script = ("const tries=%s;const qc=[];for(const u of tries){try{const r=await fetch(u);"
+                  "qc.push('read '+u+' '+r.status+' '+(r.ok?(await r.text()).slice(0,40):''))}"
+                  "catch(e){qc.push('read '+u+' blocked')}}" % json.dumps(tries))
+        page = PAGE.replace("window.READY=im.decode().then(()=>({", script + "window.READY=im.decode().then(()=>({qc,")
+        (self.root / path).parent.mkdir(parents=True, exist_ok=True)
+        (self.root / path).write_text(page.replace("'./lib/theme.mjs'", "'%s'" % (("../" * path.count("/") or "./") + "lib/theme.mjs"))
+                                      .replace("'assets/image.svg'", "'%s'" % ("../" * path.count("/") + "assets/image.svg")),
+                                      encoding="utf-8")
+
+    def test_a_local_page_cannot_read_files_outside_the_film_folder(self):
+        outside = tempfile.TemporaryDirectory(prefix="cinecode-secret-")
+        self.addCleanup(outside.cleanup)
+        secret = Path(outside.name) / "secret.txt"
+        secret.write_text("TOPSECRET", encoding="utf-8")
+        tries = [secret.as_uri(), "/../../../../../../../.." + secret.as_posix(), "%2e%2e/%2e%2e/" + secret.name]
+        try:
+            (self.root / "assets" / "link.txt").symlink_to(secret)
+            tries.append("assets/link.txt")
+        except (OSError, NotImplementedError):            # Windows without symlink rights
+            pass
+        self.probe_page("index.html", tries)
+        result = self.cap("--probe")
+        out = result.stdout + result.stderr
+        self.assertNotIn("TOPSECRET", out)
+        self.assertEqual(out.count("qc: read"), len(tries), out)
+
+    def test_a_page_below_the_film_folder_reads_its_siblings(self):
+        (self.root / "notes.txt").write_text("FILMNOTE", encoding="utf-8")
+        self.probe_page("engine/index.html", ["../notes.txt"])
+        result = self.cap("--probe", url="engine/index.html")
+        self.assertIn("read ../notes.txt 200 FILMNOTE", result.stdout)
+        self.cap(url="engine/index.html")
+        self.assertIn("0 rendered, 1 skipped", self.cap(url="engine/index.html").stdout)
+        (self.root / "lib/theme.mjs").write_text("export const tint = '#000000';", encoding="utf-8")
+        self.assertIn("1 rendered, 0 skipped", self.cap(url="engine/index.html").stdout)
+
+    def test_media_byte_ranges_are_served(self):
+        text = PAGE.replace("window.READY=im.decode().then(()=>({",
+                            "const rr=await fetch('assets/image.svg',{headers:{Range:'bytes=0-3'}});const head=rr.status+' '+(await rr.text());"
+                            "window.READY=im.decode().then(()=>({qc:['range '+head],")
+        (self.root / "index.html").write_text(text, encoding="utf-8")
+        self.assertIn("qc: range 206 <svg", self.cap("--probe").stdout)
+
+    def test_file_access_keeps_the_legacy_route(self):
+        self.assertIn("1 rendered, 0 skipped", self.cap("--file-access").stdout)
+
     @unittest.skipUnless(shutil.which("ffmpeg") and shutil.which("ffprobe"), "ffmpeg and ffprobe are required")
     def test_repeated_frames_keep_their_places_in_multi_worker_video(self):
         text = PAGE.replace("window.captureFrame=(i)=>{", "window.captureFrame=async(i)=>{if(i===0)await new Promise(r=>setTimeout(r,500));")
