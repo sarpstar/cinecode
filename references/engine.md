@@ -13,6 +13,7 @@ window.captureFrame(i, type, quality) // renderFrame(i), then returns a PNG/JPEG
 ```
 
 URL parameters: `w`, `h`, `seed`, `look`, and `capture=1` (added by capture.mjs: no preview loop).
+capture.mjs serves a local page on `http://127.0.0.1` from the film folder (the nearest folder with `STATE.md`): load assets by relative path inside it; a file outside is refused and named in the log (`--serve-root <dir>` widens it, `--file-access` is the old file:// route).
 
 Two starters:
 - `engine/scene.html` + `engine/looks.mjs`: three.js scene, look presets, text/subtitle overlay (loads three.js and postprocessing from a pinned CDN).
