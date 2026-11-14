@@ -40,7 +40,7 @@ def skill_name():
 
 SKILL = skill_name()
 TEMPLATES = ["STATE.md", "INTERVIEW.md", "ROADMAP.md", "SCRIPT.md", "HANDOFF.md", "LICENSES.csv"]
-TOOLS = ["sparks.json", "seeds.json", "make.py", "capture.mjs", "qc.py", "scene_check.py", "master_audio.py", "mix.py", "animatic.py", "validate_shots.py",
+TOOLS = ["sparks.json", "seeds.json", "make.py", "capture.mjs", "capture_webview.py", "webview_server.py", "qc.py", "scene_check.py", "master_audio.py", "mix.py", "animatic.py", "validate_shots.py",
          "asset_search.py", "deal.py", "dice.py", "footage_cut.py", "type_deal.py", "type_refs.py", "type_extract.py",
          "captions.py", "styles.py", "moves.py", "formats.py", "direction.py", "beat_grid.py", "lyrics_align.py", "voice_treat.py", "ref_video.py",
          "keys.py", "tts.py", "snapshot.py", "usage.py", "fonts.py", "words_check.py", "handoff.py", "samples.py", "sounds.py", "brief.py"]
@@ -48,7 +48,7 @@ ENGINE = ["index.html", "scene.html", "looks.mjs", "camera.mjs", "type.mjs"]
 TYPE_KIT = [("references", "type-library.json"), ("templates", "type-specimen.html"), ("starter", "type.mjs")]   # into tools/ for deal.py type
 DIRS = ["refs", "refs/type", "notes", "assets", "audio", "research", "review", "renders", "logs", "tools", "engine"]
 # direction.py in Quick mode too: the measuring library ref_video.py uses
-QUICK_TOOLS = ["sparks.json", "seeds.json", "capture.mjs", "qc.py", "scene_check.py", "master_audio.py", "mix.py", "deal.py", "dice.py", "asset_search.py",
+QUICK_TOOLS = ["sparks.json", "seeds.json", "capture.mjs", "capture_webview.py", "webview_server.py", "qc.py", "scene_check.py", "master_audio.py", "mix.py", "deal.py", "dice.py", "asset_search.py",
                "footage_cut.py", "type_deal.py", "type_refs.py", "type_extract.py", "captions.py", "styles.py", "moves.py",
                "formats.py", "beat_grid.py", "lyrics_align.py", "voice_treat.py", "ref_video.py", "direction.py", "keys.py", "tts.py", "snapshot.py",
                "make.py", "usage.py", "fonts.py", "words_check.py", "handoff.py", "samples.py", "sounds.py", "brief.py"]

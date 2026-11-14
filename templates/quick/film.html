@@ -1623,7 +1623,7 @@ if (q.get('textcheck')) {
   // The finished piece of type: its face (the last fill colour) against what is right around each letter after every
   // layer is drawn, so an outline or a shadow that separates the letters counts. A face that fills its whole box has
   // nothing around it: the type is lost in a ground of its own colour.
-  function settle(st) {
+  const settle = (st) => {
     if (!st || st.done) return;
     st.done = true;
     if (!st.ink || st.overlapped || st.alpha < 0.85 || st.cap < 6) return;
@@ -1649,7 +1649,7 @@ if (q.get('textcheck')) {
     }
     const share = faces > 0.7 * bw * bh ? 100 : all >= 20 ? Math.round((100 * low) / all) : 0;
     if (share >= 50) found.push({ kind: 'contrast', run: st.run, share });
-  }
+  };
   P.fillText = watch(P.fillText, false);
   P.strokeText = watch(P.strokeText, true);
   window.textCheck = (frame) => {

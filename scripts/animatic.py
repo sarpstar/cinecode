@@ -145,7 +145,7 @@ def main():
     cards_dir = os.path.join(work, "cards")
     if os.path.isdir(cards_dir):
         shutil.rmtree(cards_dir)                               # work files only, rebuilt every run
-    run(["node", os.path.join(HERE, "capture.mjs"), "--url", html, "--out", cards_dir])
+    run([sys.executable, os.path.join(HERE, "capture_webview.py"), "--url", html, "--out", cards_dir])
 
     segs = []
     for i, s in enumerate(shots):

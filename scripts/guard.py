@@ -319,13 +319,13 @@ def build_rules_unread(ev, name, inp):
                 "finish toolbox); this brief does not, or cannot be read, so stop and report that.")
     answers = tool_results(ev.get("transcript_path", ""))
     missing = [m for m in BUILD_READ if m not in answers]
-    probed = "[capture] renderer:" in answers
+    probed = ("[capture] renderer:" in answers) or ("renderer: " in answers and "page: " in answers)
     if not missing and probed:
         cwd = ev.get("cwd", ".")
         film = (film_of_path(path, cwd) if path else None) or film_dir(cwd) or next(iter(films_here(cwd, cmd)), None)
         why = card_unwritten(film)
         return ("cinecode: before the film's picture code, " + why + ": write it there, then the code.") if why else ""
-    return ("cinecode: before the film's picture code, " + ("" if probed else "probe the GPU (node KIT/scripts/capture.mjs "
+    return ("cinecode: before the film's picture code, " + ("" if probed else "probe the GPU (python3 KIT/scripts/capture_webview.py "
             "--url KIT/starter/index.html --probe) and ") + "read how a world is built (it is not in the parts read so "
             "far): in KIT/references/quick-mode.md the paragraphs that start '- **Renderer:' and '**Half size, never half "
             "detail', and KIT/references/finish.md whole (the Read tool, or grep for the lines; KIT = this skill's folder). Then build every world at that detail, with "
@@ -1611,7 +1611,7 @@ USER_STOPPED = re.compile(r"doesn't want to proceed|\[Request interrupted by use
 DENIED = re.compile(r"\b(onay\w*m[ıi]yor\w*|onaylama\w*|devam\s+etme\w*|kabul\s+etm[ei]\w*|"
                     r"(?:don'?t|do\s+not)\s+(?:continue|go\s+on|approve|proceed)|not\s+(?:ok|approved)|"
                     r"istemiyorum|istemem|kullanma|koyma|olmasın|ekleme|çıkar|kaldır)\b", re.I)
-WORK = re.compile(r"(make\.py|capture\.mjs|animatic\.py|handoff\.py|asset_search\.py|direction\.py|styles\.py|tts\.py|"
+WORK = re.compile(r"(make\.py|capture_webview\.py|capture\.mjs|animatic\.py|handoff\.py|asset_search\.py|direction\.py|styles\.py|tts\.py|"
                   r"deal\.py|qc\.py|qc\.sh|brief\.py|mix\.py|master_audio\.py|footage_cut\.py|captions\.py|beat_grid\.py|"
                   r"voice_treat\.py|validate_shots\.py|samples\.py|fonts\.py)")
 BOOKKEEPING = ("STATE.md", "HANDOFF.md", "INTERVIEW.md", ".gitignore")

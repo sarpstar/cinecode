@@ -338,7 +338,7 @@ def add_args(ap):
     ap.add_argument("--allow-local", action="store_true", help="type: also deal pairings whose font files are not in fonts/ yet (the user downloads them first)")
 
 
-def run(a, h, path, base_seed, save, one_line, user_default=False, capture="node tools/capture.mjs"):
+def run(a, h, path, base_seed, save, one_line, user_default=False, capture="python3 tools/capture_webview.py"):
     """deal / redeal / pick / taste for the 'type' category; deal.py hands over after parsing."""
     lib = library(a.library)
     use_user = user_default or a.user_taste or bool(os.environ.get("CINECODE_TASTE")) or os.path.exists(user_taste_path())

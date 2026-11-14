@@ -115,7 +115,7 @@ Harder: realistic human faces and hands at close range. When the story needs a p
 - All randomness is seeded (grain hashes `(frame, seed)`); no `Math.random`, `Date`, `performance.now` or `Clock` in a capture.
 - Seeded data built once (a star field, scattered props) is created lazily, after the seed is read from the URL: a small cache such as `const lazy = (make) => { let v; return () => (v ??= make()); };` filled on first use inside `renderFrame`, never at module top level before `SEED` exists.
 - Load every asset (textures, fonts: `await document.fonts.ready`) before `READY` resolves.
-- `node tools/capture.mjs --url engine/scene.html --verify` must say IDENTICAL.
+- `python3 tools/capture_webview.py --url engine/scene.html --verify` must say IDENTICAL.
 
 ## 8. Visual clichés (as of October 2026)
 

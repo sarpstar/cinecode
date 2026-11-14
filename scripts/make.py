@@ -219,7 +219,7 @@ def frame_size(arg):
 
 def probe(step, film, size):
     params = f"w={size[0]}&h={size[1]}" if size else ""
-    _, out = step.run(["node", TOOLS / "capture.mjs", "--url", film, "--probe"] + (["--params", params] if params else []))
+    _, out = step.run([sys.executable, TOOLS / "capture_webview.py", "--url", film, "--probe"] + (["--params", params] if params else []))
     m = re.search(r"page: (\d+)x(\d+), (\d+) frames @ ([\d.]+) fps", out)
     if not m:
         finish(["FAILED: the page did not report its size and frames", f"log: {rel(step.log)}"], 1)
@@ -764,7 +764,7 @@ def text_line(step, film, w, h):
     """The film's type, drawn every half second with the page's text check (film.html ?textcheck=1): two lines stacked
     over each other whose letters touch (an İ dot in the line above), and type whose letters do not stand out from
     what is around them (white on a chrome highlight). A page made before the check passes silently."""
-    _, out = step.run(["node", TOOLS / "capture.mjs", "--url", film, "--text-check", "0.5",
+    _, out = step.run([sys.executable, TOOLS / "capture_webview.py", "--url", film, "--text-check", "0.5",
                        "--params", f"w={w}&h={h}&shutter=0&weave=0&tone=0&textcheck=1"], ok=(0, 1))
     hits = [re.sub(r"^\[capture\]\s*", "", l) for l in out.splitlines() if "TEXT OVERLAP" in l or "LOW CONTRAST" in l]
     if not hits:
@@ -1515,7 +1515,7 @@ def render(a, kind):
     if short:
         finish([short], 2)
     if kind != "draft":
-        step.run(["node", TOOLS / "capture.mjs", "--url", film, "--verify", "--params", params])
+        step.run([sys.executable, TOOLS / "capture_webview.py", "--url", film, "--verify", "--params", params])
 
     t0 = time.time()
     if a.sound_only:
@@ -1524,9 +1524,9 @@ def render(a, kind):
         if not prev:
             finish([f"FAILED: --sound-only needs an earlier {kind} picture in renders/"], 2)
         picture = prev[-1]
-        step.run(["node", TOOLS / "capture.mjs", "--url", film, "--audio", score, "--params", params])
+        step.run([sys.executable, TOOLS / "capture_webview.py", "--url", film, "--audio", score, "--params", params])
     else:
-        step.run(["node", TOOLS / "capture.mjs", "--url", film, "--video", picture, "--audio", score,
+        step.run([sys.executable, TOOLS / "capture_webview.py", "--url", film, "--video", picture, "--audio", score,
                   "--workers", a.workers, "--format", "jpeg", "--quality", quality, "--maxrate", rate,
                   "--params", params, "--status", RENDERS / f"{kind}.status.json"])
     if plan:
@@ -1666,7 +1666,7 @@ def stills(a):
     n = next((k for k in range(1, 999) if not (REVIEW / f"stills-{k}").exists()), 999)
     out = REVIEW / f"stills-{n}"
     w, h = even(W / 2), even(H / 2)
-    step.run(["node", TOOLS / "capture.mjs", "--url", a.film, "--out", out, "--frames", ",".join(map(str, picks)),
+    step.run([sys.executable, TOOLS / "capture_webview.py", "--url", a.film, "--out", out, "--frames", ",".join(map(str, picks)),
               "--format", "jpeg", "--quality", "0.9", "--params", f"w={w}&h={h}"])
     n_pics = len(picks)
     cols = next((c for c in range(min(n_pics, 2 if H <= W else 4), n_pics + 1)
@@ -1833,7 +1833,7 @@ def main():
                          "red items the user chose to keep (only when the user asked)")
     a = ap.parse_args()
     mark_running(a.step)
-    for tool in ("node", "ffmpeg", "ffprobe"):
+    for tool in ("ffmpeg", "ffprobe", "minis-browser-use"):
         if not shutil.which(tool):
             finish([f"FAILED: {tool} is not installed"], 2)
     stills(a) if a.step == "stills" else render(a, a.step)

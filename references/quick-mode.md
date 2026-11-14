@@ -130,7 +130,7 @@ One question call: "Kurayım mı ★ · bir not · bir değişiklik · daha fazl
 **Words carry the film** (narration captions, kinetic type, ad copy, a lyric video): references follow question 5 (`refs/type/`, plus one `asset_search.py search --type typography` pass with "search"), then `python3 tools/deal.py deal type --purpose <…> --look <…> --mood "<tone>" --title "<title>"` and three specimen cards in the film's palette at its aspect:
 
 ```
-node tools/capture.mjs --url type/specimen.html --frames 0 --format jpeg --out review/type-1 --params "i=0&w=1080&h=1920&purpose=ad&title=…&bg=0b0d12&ink=f2efe6&accent=ff5a36"   # i=1, i=2 for the others
+python3 tools/capture_webview.py --url type/specimen.html --frames 0 --format jpeg --out review/type-1 --params "i=0&w=1080&h=1920&purpose=ad&title=…&bg=0b0d12&ink=f2efe6&accent=ff5a36"   # i=1, i=2 for the others
 ffmpeg -y -i review/type-1/000000.jpg -i review/type-2/000000.jpg -i review/type-3/000000.jpg -filter_complex "[0]scale=300:-2[a];[1]scale=300:-2[b];[2]scale=300:-2[c];[a][b][c]hstack=3" review/type-cards.jpg
 ```
 
@@ -185,7 +185,7 @@ Clicking the page in a browser plays picture and sound together for a preview.
 
 **Then always the delivery question,** never left out and never as plain text: with the question tool, in the Claude Code desktop app too (its `wrap_up` box shows two buttons and drops the rest): "Final kalitede render alayım mı ★" · "Notlarım var" · "Jüri turu" (six pinpoint questions and three fixes from the draft's own sheet, two or three minutes, `jury.md`); notes are typed in "Other".
 
-**Final:** `python3 tools/make.py final` (determinism check, full size, the chosen finishing, checks again, `<Title>.mp4` at the project's top). Another aspect: `make.py final --size 1080x1080` delivers `<Title>-1x1.mp4` beside it (9:16 1080x1920 · 16:9 1920x1080 · 1:1 · 4:5 1080x1350). Then the two questions of `SKILL.md` Hard rules: versions without clutter. For a step `make.py` does not cover: `capture.mjs` (drafts `--maxrate 4M`, half size, `shutter=0&weave=0&tone=0`), `master_audio.py <wav> <film.mp4> --video <picture.mp4> --limit` (it must print `normalization_type=linear` and OK), `qc.py all | sheet | thumb` (each `--help`).
+**Final:** `python3 tools/make.py final` (determinism check, full size, the chosen finishing, checks again, `<Title>.mp4` at the project's top). Another aspect: `make.py final --size 1080x1080` delivers `<Title>-1x1.mp4` beside it (9:16 1080x1920 · 16:9 1920x1080 · 1:1 · 4:5 1080x1350). Then the two questions of `SKILL.md` Hard rules: versions without clutter. For a step `make.py` does not cover: `capture_webview.py` (drafts `--maxrate 4M`, half size, `shutter=0&weave=0&tone=0`), `master_audio.py <wav> <film.mp4> --video <picture.mp4> --limit` (it must print `normalization_type=linear` and OK), `qc.py all | sheet | thumb` (each `--help`).
 
 ## 5. Revisions on drafts (max 2 rounds)
 

@@ -14,7 +14,7 @@ the Quick template's `character()`. Realistic people stay out unless the user in
 
 ## 2. The model sheet before any scene
 
-`node tools/capture.mjs --url film.html --frames 0 --format jpeg --out review/cast-<name> --params "w=1920&h=1080&modelsheet=<name>"`
+`python3 tools/capture_webview.py --url film.html --frames 0 --format jpeg --out review/cast-<name> --params "w=1920&h=1080&modelsheet=<name>"`
 draws every view (front, three-quarter, side, back), all 16 emotions as busts and the actions on one frame. Read it
 like a product's hero still (`quick-mode.md` §3): proportions consistent across views, every emotion readable at
 phone size, colours separate from the film's grounds. Send it to the user (`SendUserFile`, render) with the first
