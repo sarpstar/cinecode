@@ -33,6 +33,21 @@ MOVE_NAMES = ("pan", "tilt", "dolly in", "dolly out", "dolly zoom", "vertigo", "
 LINE_MAX_WORDS = 9
 
 
+def window(t):
+    """A 't' value as a [start, end] pair of numbers, or None when it is not that shape: a window written
+    as text ("0.4-3.0") is read, anything else malformed is None, so the caller reports it as an invalid
+    window instead of dying on it (a hand-written shots.json is exactly what this tool exists to check)."""
+    if isinstance(t, str):
+        m = re.fullmatch(r"\s*(-?\d+(?:\.\d+)?)\s*-\s*(-?\d+(?:\.\d+)?)\s*", t)   # a sign is read, not dropped
+        t = [m.group(1), m.group(2)] if m else []
+    if not isinstance(t, (list, tuple)) or len(t) != 2:
+        return None
+    try:
+        return [float(t[0]), float(t[1])]
+    except (TypeError, ValueError):
+        return None
+
+
 def camera_move(shot):
     """The shot's camera move as a dict, whether written as an object, a move object or a bare camera line."""
     cam = shot.get("camera") or {}
@@ -183,9 +198,9 @@ def main(path):
         if not reads:
             err(f"{sid}: no reads (what must the viewer understand here?)")
         for r in reads:
-            t = r.get("t") or [None, None]
-            if t[0] is None or t[1] is None or t[1] <= t[0] or t[0] < -1e-6 or t[1] > dur + 1e-6:
-                err(f"{sid}: read '{str(r.get('read', ''))[:40]}' window {t} is invalid or outside 0-{dur:.2f} s")
+            t = window(r.get("t"))
+            if t is None or t[1] <= t[0] or t[0] < -1e-6 or t[1] > dur + 1e-6:
+                err(f"{sid}: read '{str(r.get('read', ''))[:40]}' window {r.get('t')} is invalid or outside 0-{dur:.2f} s")
             elif t[1] - t[0] < 0.5:
                 warn(f"{sid}: read '{str(r.get('read', ''))[:40]}' gets only {t[1] - t[0]:.2f} s")
 
@@ -196,15 +211,12 @@ def main(path):
 
         for tx in s.get("text_on_screen") or []:
             words = len(str(tx.get("text", "")).split())
-            t = tx.get("t") or [0, 0]
-            if isinstance(t, str):                     # "0.4-3.0" written as text
-                t = [float(x) for x in __import__("re").findall(r"\d+(?:\.\d+)?", t)][:2] or [0, 0]
-            t = [float(x) for x in t] if len(t) == 2 and all(isinstance(x, (int, float, str)) for x in t) else [0, 0]
+            t = window(tx.get("t")) or [0, 0]          # a malformed window falls to [0, 0]: invalid below
             need = 0.6 + 0.25 * words
             if words > TEXT_MAX_WORDS:
                 err(f"{sid}: on-screen text '{tx.get('text')}' has {words} words (max {TEXT_MAX_WORDS})")
             if t[0] < -1e-6 or t[1] > dur + 1e-6 or t[1] <= t[0]:
-                err(f"{sid}: on-screen text '{tx.get('text')}' window {t} is invalid or outside 0-{dur:.2f} s")
+                err(f"{sid}: on-screen text '{tx.get('text')}' window {tx.get('t')} is invalid or outside 0-{dur:.2f} s")
             elif t[1] - t[0] + 1e-6 < need:
                 err(f"{sid}: on-screen text '{tx.get('text')}' is shown {t[1] - t[0]:.2f} s, needs {need:.2f} s")
 
@@ -219,13 +231,12 @@ def main(path):
     total = prev_end or 0
     for tx in film.get("text_on_screen") or []:      # the film's own text track: words that span beats (a one-shot film)
         words = len(str(tx.get("text", "")).split())
-        t = tx.get("t") or [0, 0]
-        t = [float(x) for x in t] if isinstance(t, list) and len(t) == 2 and all(isinstance(x, (int, float)) for x in t) else [0, 0]
+        t = window(tx.get("t")) or [0, 0]            # the same window rules as a shot's text (see window())
         need = 0.6 + 0.25 * words
         if words > TEXT_MAX_WORDS:
             err(f"film text '{tx.get('text')}' has {words} words (max {TEXT_MAX_WORDS})")
         if t[0] < -1e-6 or t[1] > total / fps + 1e-6 or t[1] <= t[0]:
-            err(f"film text '{tx.get('text')}' window {t} is invalid or outside 0-{total / fps:.2f} s")
+            err(f"film text '{tx.get('text')}' window {tx.get('t')} is invalid or outside 0-{total / fps:.2f} s")
         elif t[1] - t[0] + 1e-6 < need:
             err(f"film text '{tx.get('text')}' is shown {t[1] - t[0]:.2f} s, needs {need:.2f} s")
     if "duration_frames" in film and film["duration_frames"] != total:
