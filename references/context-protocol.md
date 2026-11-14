@@ -28,7 +28,7 @@ The main chat is the **coordinator and the builder**. It talks with the user, ke
 
 1. **Save verbatim.** The user's notes go, exactly as written, into `notes/round-N.md` (one file per round), with timestamps and shot ids where given. Ask once, in one batch, for any note that has neither.
 2. **Split per shot.** Under the verbatim block the coordinator writes the split table: note id · time · shot · layer (picture / text / sound / timing) · action · model · status. It lists the **unchanged shots** explicitly.
-3. **Dispatch.** Up to five targeted edits the coordinator makes itself (§1); beyond that, one fresh subagent per affected shot (text and sound notes get their own). Independent shots run in parallel; heavy GPU renders run one at a time on the machine. Each brief cites the shot's row and its notes section only.
+3. **Dispatch.** Up to five targeted edits the coordinator makes itself (§1); beyond that, one fresh subagent per affected shot (text and sound notes get their own). Independent shots run in parallel; renders go through the single WebView, so only one page renders at a time (frames are still independent and re-renderable in any order). Each brief cites the shot's row and its notes section only.
 4. **Unaffected shots are never touched:** no edits, no re-renders. Re-encode only the changed shots and concat again.
 5. **Reply note by note,** one line each: done / done differently because… / open because…. New version file; older versions are cleared only after the user's OK on the final (`SKILL.md` Hard rules: versions without clutter).
 6. **A scope change is a re-plan.** A note that adds shots or scenes or changes the total length is not split per shot: the roadmap and shot list are updated, the user sees the new plan with one still per new or changed shot, and production starts again after the OK. In Quick mode a re-plan does not use one of the two revision rounds.
@@ -50,7 +50,7 @@ Unchanged: S01 S02 S03 S05 S06
 
 For any defect (geometry, explosion or other VFX, reflection, screen direction, timing, audio):
 
-1. **Reproduce cheaply.** A helper renders 1–3 test frames at the defect (`capture.mjs --start <f> --end <f>`) or takes the measurement (`qc.py`, `ffprobe`, parameter values logged at that frame) and writes `review/diag/<shot>-<issue>.md`: symptom, frames, **root cause** (the parameter or code lines that cause it), the smallest fix, confidence, the cost of the fix.
+1. **Reproduce cheaply.** A helper renders 1–3 test frames at the defect (`capture_webview.py --start <f> --end <f>`) or takes the measurement (`qc.py`, `ffprobe`, parameter values logged at that frame) and writes `review/diag/<shot>-<issue>.md`: symptom, frames, **root cause** (the parameter or code lines that cause it), the smallest fix, confidence, the cost of the fix.
 2. **Fix the smallest thing.** Parameter first, then the local code, a whole-shot rebuild last. Re-render the same test frames, compare, then render the shot window.
 3. **No blind retries:** a fix that failed is diagnosed again before the next attempt; the next helper gets the diagnosis file, never the failed helper's chat.
 4. **A second rebuild of the same issue needs the user's OK,** with the estimated cost stated first (§6).

@@ -277,7 +277,7 @@ cinecode/
 ├── scripts/              araçlar (Python standart kütüphanesi ve Node)
 │   ├── init_film.py      film klasörünü kurar
 │   ├── make.py           kareler, taslak ve final tek komutla
-│   ├── capture.mjs       başsız Chrome'da kare kare render
+│   ├── capture_webview.py       başsız Chrome'da kare kare render
 │   ├── deal.py, dice.py  kıvılcımlar ve dış zar
 │   ├── direction.py      stil panosu; styles.py, asset_search.py, fonts.py ile
 │   ├── mix.py            miks; master_audio.py (−14 LUFS), tts.py (anlatıcı), beat_grid.py
@@ -318,7 +318,7 @@ filmim/
 
 **Bir film ne kadar sürer?** Hızlı modda 30 saniyelik bir film kısa bir oturumdur: birkaç soru, bir plan, bakılacak iki sahne, hızlı bir taslak, sonra final render (her biri saniyelerle dakikalar arası). Film modunda 30 saniyelik bir film genellikle birkaç oturumdur: görüşme ve yol haritası dakikalar sürer, senaryo ve stil karesi bir oturum, 30 saniyelik filmin renderı güncel bir GPU'da dakikalar alır. Zamanın çoğu senin notlarına gider; amaç da bu.
 
-**Güçlü bir GPU gerekir mi?** Güncel her Mac (Apple silicon) ya da sürücüsü çalışan bir PC yeterli. Ajan bunu başta kontrol eder (`capture.mjs --probe`). Başsız Chrome'da GPU yoksa render CPU'ya düşer: test için yeterli, tüm film için yavaş.
+**Güçlü bir GPU gerekir mi?** Güncel her Mac (Apple silicon) ya da sürücüsü çalışan bir PC yeterli. Ajan bunu başta kontrol eder (`capture_webview.py --probe`). Başsız Chrome'da GPU yoksa render CPU'ya düşer: test için yeterli, tüm film için yavaş.
 
 **Kendi referanslarımı kullanabilir miyim?** Evet: görselleri `refs/` içine, linkleri ya da film adı + dakikayı `refs/links.txt` içine bırak. Telif hakkı olan referanslar yalnızca hava/ton için kullanılır, karelere asla girmez.
 

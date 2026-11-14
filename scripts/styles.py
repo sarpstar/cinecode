@@ -231,12 +231,14 @@ def family_poster(data, fam):
     if os.path.exists(dest) and os.path.getsize(dest) > 0:
         return dest
     kit = os.path.dirname(os.path.normpath(data["dir"]))
-    page, capture = os.path.join(kit, "templates", "quick", "film.html"), os.path.join(HERE, "capture.mjs")
-    if not (os.path.exists(page) and os.path.exists(capture) and shutil.which("node")):
+    page = os.path.join(kit, "templates", "quick", "film.html")
+    capture = os.path.join(HERE, "capture_webview.py")
+    if not (os.path.exists(page) and os.path.exists(capture)):
         return None
     tmp = dest + ".frames"
-    r = subprocess.run(["node", capture, "--url", page, "--frames", "84", "--format", "jpeg", "--out", tmp,
-                        "--params", f"look={fam}&w=640&h=360"], capture_output=True, text=True)
+    r = subprocess.run([sys.executable, capture, "--url", page, "--frames", "84", "--format", "jpeg",
+                        "--out", tmp, "--params", f"look={fam}&w=640&h=360"],
+                       capture_output=True, text=True)
     frames = sorted(f for f in os.listdir(tmp) if f.endswith(".jpg")) if os.path.isdir(tmp) else []
     if r.returncode != 0 or not frames:
         shutil.rmtree(tmp, ignore_errors=True)

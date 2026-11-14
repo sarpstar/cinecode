@@ -277,7 +277,7 @@ cinecode/
 ├── scripts/              the tools (Python standard library and Node)
 │   ├── init_film.py      sets up the film's folder
 │   ├── make.py           stills, draft and final, one command each
-│   ├── capture.mjs       frame-by-frame render in headless Chrome
+│   ├── capture_webview.py       frame-by-frame render in headless Chrome
 │   ├── deal.py, dice.py  sparks and the outside dice
 │   ├── direction.py      the style board; with styles.py, asset_search.py, fonts.py
 │   ├── mix.py            the mix; master_audio.py (−14 LUFS), tts.py (narrator), beat_grid.py
@@ -318,7 +318,7 @@ my-film/
 
 **How long does a film take?** In Quick mode a 30-second film is one short session: a few questions, one plan, two scenes to look at, a quick draft, then the final render (seconds to minutes each). In Film mode a 30-second film is usually a few sessions: the interview and roadmap take minutes, the script and style frame one sitting, and the render of a 30-second film takes minutes on a recent GPU. Most of the time goes into your notes, which is the point.
 
-**Do I need a powerful GPU?** Any recent Mac (Apple silicon) or a PC with a working graphics driver is enough. The agent checks this at the start (`capture.mjs --probe`). Without a GPU in headless Chrome, rendering falls back to the CPU: fine for tests, slow for a whole film.
+**Do I need a powerful GPU?** Any recent Mac (Apple silicon) or a PC with a working graphics driver is enough. The agent checks this at the start (`capture_webview.py --probe`). Without a GPU in headless Chrome, rendering falls back to the CPU: fine for tests, slow for a whole film.
 
 **Can I use my own references?** Yes: drop images into `refs/` and links or film titles with timestamps into `refs/links.txt`. Copyrighted references are used for mood only, never in frames.
 

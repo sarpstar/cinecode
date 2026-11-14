@@ -1,6 +1,6 @@
 # Engine: render, encode, check
 
-Every film frame is a **pure function of time**: `frame = f(t, seed)`. Any frame renders alone, out of order, in parallel, with identical pixels. The GPU in headless Chrome draws each frame; `capture.mjs` saves them; ffmpeg encodes.
+Every film frame is a **pure function of time**: `frame = f(t, seed)`. Any frame renders alone, out of order, in parallel, with identical pixels. Minis's built-in WebView draws each frame (GPU-accelerated canvas); `capture_webview.py` drives it, receives the frames over the local loopback and writes them; ffmpeg encodes.
 
 ## 1. The frame contract
 
@@ -12,7 +12,7 @@ window.renderFrame(i) // draws frame i (t = i / fps); no state carried between f
 window.captureFrame(i, type, quality) // renderFrame(i), then returns a PNG/JPEG data URL
 ```
 
-URL parameters: `w`, `h`, `seed`, `look`, and `capture=1` (added by capture.mjs: no preview loop).
+URL parameters: `w`, `h`, `seed`, `look`, and `capture=1` (added by capture_webview.py: no preview loop). The page is served over `http://127.0.0.1:<port>` by `webview_server.py` (never `file://`), so relative imports and fonts resolve and the page can POST its frames back.
 
 Two starters:
 - `engine/scene.html` + `engine/looks.mjs`: three.js scene, look presets, text/subtitle overlay (loads three.js and postprocessing from a pinned CDN).
@@ -23,21 +23,18 @@ One page per shot or one page for the whole film (a `shot` URL parameter choosin
 ## 2. Capture
 
 ```bash
-node tools/capture.mjs --url engine/scene.html --probe                       # which GPU? (warns on software rendering)
-node tools/capture.mjs --url engine/scene.html --verify                      # deterministic? must say IDENTICAL
-node tools/capture.mjs --url engine/scene.html --out review/frames/S01 --start 0 --end 0 --params "w=960&h=540"   # one still
-node tools/capture.mjs --url engine/scene.html --out frames/S01 --start 0 --end 71 --workers 2 --params "w=1080&h=1920&shot=S01"
+python3 tools/capture_webview.py --url engine/scene.html --probe                       # which renderer? (reports the page's warnings)
+python3 tools/capture_webview.py --url engine/scene.html --verify                      # deterministic? must say IDENTICAL
+python3 tools/capture_webview.py --url engine/scene.html --out review/frames/S01 --start 0 --end 0 --params "w=960&h=540"   # one still
+python3 tools/capture_webview.py --url engine/scene.html --out frames/S01 --start 0 --end 71 --params "w=1080&h=1920&shot=S01"
 ```
 
 - More options: `--frames "0,48,96"` (only these frames, for previews), `--video out.mp4` (pipe frames into ffmpeg with the encode settings of §3, no frame files), `--audio out.wav` (export the page's `window.renderAudio()` soundtrack as a 32-bit float WAV; Quick mode, `quick-mode.md` §4).
-- Local capture resumes only when the page, parameters and contents of the local files loaded before `READY` match the saved capture. This includes imported modules, fonts and review stills in any folder, even when file dates are preserved. Output and status files do not invalidate an unchanged job. `--fresh` regenerates the requested frames explicitly; old unstamped frames are regenerated automatically. HTTP pages render afresh; use `--fresh` for local pages after unpinned remote assets change.
-- `--workers` is a positive integer; `--start`, `--end` and every `--frames` entry are non-negative integers. Invalid ranges fail without clearing an existing frame folder. The page's `READY` metadata must provide positive integer `frames`, `width` and `height`, and a positive `fps`.
-- **Long jobs run in the background with a status file** and the agent ends its turn instead of waiting: start the command with the shell tool's background option (`run_in_background`, the same in bash and PowerShell):
-  ```
-  node tools/capture.mjs --url engine/scene.html --out frames/S03 --start 192 --end 335 --workers 2 --status renders/S03.status.json
-  ```
-  Record the job in `STATE.md` (Running jobs). Next turn: read the status file (`state`, `done`, `total`, `eta_s`).
-- One heavy render at a time on the machine; 2–3 workers inside it.
+- **There is no worker pool here.** One WebView renders one page, so frames are drawn one at a time; a second page would need a second browser tab. Size the shot list to that (drafts at half size, JPEG) instead of assuming parallelism.
+- Existing frames in the output folder are **skipped and reused** (the render reports `N rendered, M skipped`); pass `--fresh` to redraw them. A job that is interrupted can simply be re-run: only the missing frames are drawn.
+- `--start`, `--end` and every `--frames` entry are non-negative integers; invalid values fail without clearing an existing frame folder. The page's `READY` metadata must provide positive integer `frames`, `width` and `height`, and a positive `fps`.
+- **Long jobs:** the WebView tool serialises calls, so a long render is one long call rather than a background job. Render in chunks (`--start/--end` in the page's `frames` units) and report progress after each chunk, or let the run block and say so up front. Rendered frames persist, so a chunked job costs nothing extra.
+- One page at a time: close the tab (or navigate away) before starting a different film, otherwise two pages fight over the same tab.
 - Drafts: half size and `--format jpeg --quality 0.9`. Finals: full size PNG.
 
 ## 3. Encode

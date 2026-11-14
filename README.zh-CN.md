@@ -277,7 +277,7 @@ cinecode/
 ├── scripts/              工具（Python 标准库和 Node）
 │   ├── init_film.py      建立影片文件夹
 │   ├── make.py           静帧、样片和成片，各一条命令
-│   ├── capture.mjs       在无头 Chrome 中逐帧渲染
+│   ├── capture_webview.py       在无头 Chrome 中逐帧渲染
 │   ├── deal.py, dice.py  灵感卡和外部骰子
 │   ├── direction.py      风格面板；配合 styles.py、asset_search.py、fonts.py
 │   ├── mix.py            混音；master_audio.py（−14 LUFS）、tts.py（旁白）、beat_grid.py
@@ -318,7 +318,7 @@ my-film/
 
 **做一部影片要多久？** 在快速模式中，30 秒的影片只需一次简短的会话：几个问题、一份方案、两个场景供你查看、一版快速草稿，然后是最终渲染（每一步几秒到几分钟）。在电影模式中，30 秒的影片通常需要几次会话：访谈和路线图几分钟，剧本和风格帧一次坐下来搞定，而在较新的 GPU 上渲染 30 秒影片只需几分钟。大部分时间花在你的意见上，而这正是重点所在。
 
-**需要强大的 GPU 吗？** 任何较新的 Mac（Apple 芯片）或显卡驱动正常的 PC 就足够了。智能体会在开始时检查这一点（`capture.mjs --probe`）。如果无头 Chrome 中没有 GPU，渲染会退回到 CPU：用来测试没问题，渲染整部影片就太慢了。
+**需要强大的 GPU 吗？** 任何较新的 Mac（Apple 芯片）或显卡驱动正常的 PC 就足够了。智能体会在开始时检查这一点（`capture_webview.py --probe`）。如果无头 Chrome 中没有 GPU，渲染会退回到 CPU：用来测试没问题，渲染整部影片就太慢了。
 
 **可以用我自己的参考吗？** 可以：把图片放进 `refs/`，把链接或带时间点的电影名写进 `refs/links.txt`。受版权保护的参考只用于氛围，绝不会出现在画面中。
 

@@ -183,7 +183,7 @@ pairing ×(1−0.6d), family ×(1−0.35d), tag ×(1−0.15d); passed tag ×(1�
    **Only when none of the three carries the film's voice** (or the user asks for others): `python3 tools/fonts.py search "<the film's tone>" [--role text]` ranks 2,000+ open-licence fonts with Turkish letters by tone (Google Fonts' expressive scores: playful, calm, rugged, vintage, sophisticated, futuristic…), leaving out the fonts AI designs overuse; `fonts.py role <id>` prints the pinned TYPE role.
 4. **Specimen cards in the film's look** at the deliverable aspect, one per pairing (title, subtitle, label,
    numerals, a Turkish line, a lower third + price + CTA + legal line for ads; a title card shaped by the
-   direction for cinematic): `node tools/capture.mjs --url type/specimen.html --frames 0 --format jpeg --out
+   direction for cinematic): `python3 tools/capture_webview.py --url type/specimen.html --frames 0 --format jpeg --out
    review/type-<n> --params "i=<n-1>&w=…&h=…&purpose=…&title=…&bg=…&ink=…&accent=…&still=../review/<frame>.jpg&dir=direction-draft.json"`.
    A local-file pairing needs its files in `fonts/` first (the user downloads them; GitLab and Fontshare files are
    never fetched automatically).
