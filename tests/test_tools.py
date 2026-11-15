@@ -25,6 +25,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 import asset_search
 import captions
 import keys
+import sounds
 import tts
 
 
@@ -332,6 +333,62 @@ class Tools(unittest.TestCase):
         self.assertEqual(result.stdout, "notlar.md\0")
         result = subprocess.run(cmd, cwd=self.path, capture_output=True, text=True, check=True)
         self.assertIn("nothing changed", result.stdout)
+
+    def test_kenney_download_follows_the_signed_link(self):
+        # Kenney no longer links the zip from the asset page: the page carries
+        # a data-download-id and /download-link/<id> answers a signed zip URL
+        # only when the asset page is the Referer (issue #6).
+        cache = self.path / "cache"
+        buf = io.BytesIO()
+        import zipfile
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("Audio/impactGlass_light_000.ogg", b"fake-ogg")
+            z.writestr("preview.ogg", b"skip-me")
+        seen = []
+
+        def fake_open(req, timeout=None):
+            url = req.full_url
+            seen.append(url)
+            if "/download-link/" in url:
+                self.assertEqual(req.get_header("Referer"), "https://kenney.nl/assets/impact-sounds")
+                return io.BytesIO(json.dumps({"url": "https://kenney.nl/download/abc/def?expires=1"}).encode())
+            if url.startswith("https://kenney.nl/download/"):
+                return io.BytesIO(buf.getvalue())
+            page = ("<a data-download-id='6173736574732f696d706163742d736f756e6473' "
+                    "onclick='return initiateDownload(this)'>Download</a>")
+            return io.BytesIO(page.encode())
+
+        with patch.object(sounds, "CACHE", cache), patch.object(sounds.urllib.request, "urlopen", fake_open):
+            sounds.download("impact")
+        self.assertTrue((cache / "kenney" / "impact-sounds" / "impactGlass_light_000.ogg").exists())
+        self.assertFalse((cache / "kenney" / "impact-sounds" / "preview.ogg").exists())
+        self.assertIn("https://kenney.nl/download-link/6173736574732f696d706163742d736f756e6473", seen)
+
+    def test_kenney_download_names_a_refused_signed_link(self):
+        def fake_open(req, timeout=None):
+            if "/download-link/" in req.full_url:
+                return io.BytesIO(b'{"error": "forbidden"}')
+            return io.BytesIO(b"<a data-download-id='6173736574732f696d706163742d736f756e6473'>Download</a>")
+
+        with patch.object(sounds, "CACHE", self.path / "cache"), \
+                patch.object(sounds.urllib.request, "urlopen", fake_open), \
+                self.assertRaisesRegex(RuntimeError, r"no download link on kenney\.nl/assets/impact-sounds \(forbidden\)"):
+            sounds.download("impact")
+
+    def test_kenney_download_keeps_the_direct_zip_form(self):
+        buf = io.BytesIO()
+        import zipfile
+        with zipfile.ZipFile(buf, "w") as z:
+            z.writestr("Audio/impactGlass_light_000.ogg", b"fake-ogg")
+
+        def fake_open(req, timeout=None):
+            if req.full_url.endswith(".zip"):
+                return io.BytesIO(buf.getvalue())
+            return io.BytesIO(b'<a href="https://kenney.nl/media/pages/assets/impact-sounds/abc/impact-sounds.zip">zip</a>')
+
+        with patch.object(sounds, "CACHE", self.path / "cache"), patch.object(sounds.urllib.request, "urlopen", fake_open):
+            sounds.download("impact")
+        self.assertTrue((self.path / "cache" / "kenney" / "impact-sounds" / "impactGlass_light_000.ogg").exists())
 
     @unittest.skipUnless(shutil.which("git"), "Git is required")
     def test_snapshot_skips_parent_repository(self):

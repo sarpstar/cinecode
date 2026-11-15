@@ -93,14 +93,44 @@ def recent(films=3):
     return {k: u["project"] for k, uses in shown.items() for u in uses if u["project"] in last}
 
 
+def _read(url, headers=None, timeout=30):
+    req = urllib.request.Request(url, headers=headers or {"User-Agent": UA})
+    return urllib.request.urlopen(req, timeout=timeout).read()
+
+
+def download_link(slug):
+    """The zip URL for a Kenney asset page.
+
+    Kenney no longer links the zip directly from the page: the page carries
+    a data-download-id (the hex of "assets/<slug>"), and GET
+    kenney.nl/download-link/<id> with the asset page as Referer answers
+    {"url": "<signed zip url>"} — without the Referer it answers
+    {"error": "forbidden"}. The signed URL expires, so it cannot be pinned;
+    ask for a fresh one on every download.
+    """
+    page_url = f"https://kenney.nl/assets/{slug}"
+    page = _read(page_url, timeout=30).decode("utf-8", "replace")
+    direct = re.search(r'https://kenney\.nl/media/pages/assets/[^"]+\.zip', page)
+    if direct:                      # the old form, if the page ever goes back to it
+        return direct[0]
+    m = re.search(r"data-download-id='([0-9a-f]+)'", page)
+    dl_id = m[1] if m else ("assets/" + slug).encode().hex()
+    body = _read(f"https://kenney.nl/download-link/{dl_id}",
+                 headers={"User-Agent": UA, "Referer": page_url}, timeout=30)
+    try:
+        payload = json.loads(body.decode("utf-8", "replace"))
+    except ValueError:
+        raise RuntimeError(f"kenney.nl/download-link/{dl_id} did not answer JSON")
+    url = payload.get("url") if isinstance(payload, dict) else None
+    if not url:
+        detail = payload.get("error", "no url") if isinstance(payload, dict) else "bad answer"
+        raise RuntimeError(f"no download link on kenney.nl/assets/{slug} ({detail})")
+    return url
+
+
 def download(prefix):
     slug = PACKS[prefix][0]
-    page = urllib.request.urlopen(urllib.request.Request(f"https://kenney.nl/assets/{slug}", headers={"User-Agent": UA}),
-                                  timeout=30).read().decode("utf-8", "replace")
-    m = re.search(r'https://kenney\.nl/media/pages/assets/[^"]+\.zip', page)
-    if not m:
-        raise RuntimeError(f"no download link on kenney.nl/assets/{slug}")
-    data = urllib.request.urlopen(urllib.request.Request(m[0], headers={"User-Agent": UA}), timeout=120).read()
+    data = _read(download_link(slug), timeout=120)
     dest = CACHE / "kenney" / slug
     with zipfile.ZipFile(io.BytesIO(data)) as z:
         for name in z.namelist():
