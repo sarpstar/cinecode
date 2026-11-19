@@ -25,6 +25,12 @@
 //                                      Promise<AudioBuffer> (e.g. from OfflineAudioContext.startRendering());
 //                                      written as a 32-bit float WAV (no clipping; master it afterwards).
 //                                      Works alone (audio only) or together with --out / --video.
+//   --serve-root films/my-film         the folder a local page is served from (default below)
+//   --file-access                      legacy: open the local page as file:// with --allow-file-access-from-files
+// Local pages are served over http://127.0.0.1 from one folder: the nearest folder at or above the page that holds
+// STATE.md (the film folder), otherwise the page's own folder. The page and the code it loads can read only that
+// folder, not the rest of the disk (file:// with --allow-file-access-from-files would let any loaded script read any
+// local file). A request outside it is refused and named in the log.
 // Env: CHROME_PATH=/path/to/chrome to override browser discovery.
 // Local frames resume when page/params/loaded local file contents match (not with --video). --fresh regenerates them.
 // HTTP pages render afresh. Local pages with changed unpinned remote assets should use --fresh.
@@ -35,15 +41,16 @@
 
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, rmSync, statSync, writeFileSync, writeSync, renameSync } from 'node:fs';
+import { closeSync, createReadStream, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readSync, readdirSync, realpathSync, rmSync, statSync, writeFileSync, writeSync, renameSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, extname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const args = parseArgs(process.argv.slice(2));
 if (args.help || args.h) { usage(null); }
 if (typeof args.url !== 'string' || !args.url.trim()) usage('missing --url value');
-for (const key of ['out', 'video', 'audio', 'status', 'params']) {
+for (const key of ['out', 'video', 'audio', 'status', 'params', 'serve-root']) {
   if (args[key] !== undefined && (typeof args[key] !== 'string' || !args[key].trim())) usage(`--${key} needs a value`);
 }
 const workers = +(args.workers ?? 1);
@@ -67,7 +74,26 @@ if (args.frames !== undefined && (typeof args.frames !== 'string' ||
 const ext = format === 'jpeg' || format === 'jpg' ? 'jpg' : 'png';
 const mime = ext === 'jpg' ? 'image/jpeg' : 'image/png';
 
-const pageUrl = buildUrl(args.url, args.params);
+const MIME = {
+  '.html': 'text/html; charset=utf-8', '.htm': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
+  '.mjs': 'text/javascript; charset=utf-8', '.cjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8',
+  '.json': 'application/json', '.map': 'application/json', '.txt': 'text/plain; charset=utf-8',
+  '.csv': 'text/csv; charset=utf-8', '.md': 'text/plain; charset=utf-8', '.xml': 'application/xml',
+  '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif',
+  '.webp': 'image/webp', '.avif': 'image/avif', '.bmp': 'image/bmp', '.ico': 'image/x-icon',
+  '.woff': 'font/woff', '.woff2': 'font/woff2', '.ttf': 'font/ttf', '.otf': 'font/otf',
+  '.wav': 'audio/wav', '.mp3': 'audio/mpeg', '.ogg': 'audio/ogg', '.oga': 'audio/ogg', '.m4a': 'audio/mp4',
+  '.flac': 'audio/flac', '.aac': 'audio/aac', '.opus': 'audio/ogg',
+  '.mp4': 'video/mp4', '.m4v': 'video/mp4', '.webm': 'video/webm', '.mov': 'video/quicktime',
+  '.wasm': 'application/wasm', '.glb': 'model/gltf-binary', '.gltf': 'model/gltf+json',
+};
+let served = null;                                      // { origin, root }: maps loaded URLs back to files
+const pageUrl = buildUrl(args.url, args.params);       // the page's identity: status file and resume stamp
+const isLocal = pageUrl.startsWith('file:');
+const fileAccess = args['file-access'] === true;
+if (args['serve-root'] !== undefined && (!isLocal || fileAccess)) usage('--serve-root is for a local page served over http');
+const serve = isLocal && !fileAccess ? await startServer(pageUrl, args['serve-root']) : null;
+const loadUrl = serve ? serve.url : pageUrl;            // what Chrome opens
 const chrome = findChrome();
 const extraFlags = typeof args.flags === 'string' ? args.flags.split(/\s+/).filter(Boolean) : [];
 const statusFile = typeof args.status === 'string' ? resolve(args.status) : null;
@@ -103,7 +129,7 @@ process.on('exit', () => {
 });
 
 const t0 = Date.now();
-const first = await openPage(chrome, pageUrl);
+const first = await openPage(chrome, loadUrl);
 const info = await first.ready();
 if (!info || !['frames', 'width', 'height'].every((k) => Number.isSafeInteger(info[k]) && info[k] > 0) ||
     !Number.isFinite(info.fps) || info.fps <= 0) {
@@ -203,7 +229,7 @@ const n = Math.min(workers, total);
 const chunks = Array.from({ length: n }, (_, w) => list.map((_, k) => k).filter((k) => k % n === w));   // positions in list
 const pages = [first];
 for (let i = 1; i < chunks.length; i++) {
-  const p = await openPage(chrome, pageUrl);
+  const p = await openPage(chrome, loadUrl);
   await p.ready();
   pages.push(p);
 }
@@ -335,7 +361,7 @@ async function exportAudio(page, file, info) {
 // Content hashes catch replacements that preserve size/date. Read in chunks so a large video does not fill RAM.
 // Remote pages are rendered afresh because their complete inputs cannot be verified from the local filesystem.
 function pageStamp(page) {
-  if (!pageUrl.startsWith('file:')) return null;
+  if (!isLocal) return null;
   const h = createHash('sha256').update(JSON.stringify([pageUrl, format, quality]));
   const buffer = Buffer.allocUnsafe(1024 * 1024);
   for (const file of page.localFiles()) {
@@ -376,8 +402,8 @@ async function openPage(chromePath, url) {
     '--use-mock-keychain', '--password-store=basic',   // never ask the system keychain (a macOS dialog)
     '--hide-scrollbars', '--enable-gpu', '--ignore-gpu-blocklist',
     '--disable-background-timer-throttling', '--disable-renderer-backgrounding',
-    '--allow-file-access-from-files',
   ];
+  if (fileAccess) flags.push('--allow-file-access-from-files');   // legacy only: a local page is served over http
   if (process.platform === 'darwin') flags.push('--use-angle=metal');
   flags.push(...extraFlags);
   const proc = spawn(chromePath, [...flags, url], { stdio: ['ignore', 'ignore', 'pipe'] });
@@ -472,7 +498,7 @@ async function openPage(chromePath, url) {
 
   return {
     localFiles() {
-      return [...new Set([...loadedUrls].filter((u) => u.startsWith('file:')).map((u) => fileURLToPath(new URL(u))))].sort();
+      return [...new Set([...loadedUrls].map(localPath).filter(Boolean))].sort();
     },
     async eval(expression, ms = EVAL_MS) {
       const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true }, ms);
@@ -497,6 +523,94 @@ async function openPage(chromePath, url) {
       try { rmSync(profile, { recursive: true, force: true }); } catch { /* temp browser profile only */ }
     },
   };
+}
+
+// A local page is served over http://127.0.0.1 from one folder (its film folder, or its own folder), so the scripts
+// it loads cannot read the rest of the disk. Paths resolve through symlinks and must stay inside that folder; GET and
+// HEAD only, single byte ranges for media seeking, never cached.
+
+function within(root, p) {
+  const r = relative(root, p);
+  return r === '' || (!r.startsWith('..' + sep) && r !== '..' && !isAbsolute(r));
+}
+
+function serveRoot(pageFile, chosen) {
+  if (chosen) return resolve(chosen);
+  for (let d = dirname(pageFile); ; d = dirname(d)) {
+    if (existsSync(join(d, 'STATE.md'))) return d;      // the film folder
+    if (dirname(d) === d) return dirname(pageFile);     // no film folder above: only the page's own folder
+  }
+}
+
+async function startServer(fileUrl, chosen) {
+  const pageFile = fileURLToPath(new URL(fileUrl));
+  if (!existsSync(pageFile)) usage(`page not found: ${pageFile}`);
+  let root;
+  try { root = realpathSync(serveRoot(pageFile, chosen)); } catch { usage(`--serve-root not found: ${chosen}`); }
+  if (!statSync(root).isDirectory()) usage(`--serve-root is not a folder: ${root}`);
+  const realPage = realpathSync(pageFile);
+  if (!within(root, realPage)) usage(`the page ${pageFile} is outside the served folder ${root}; set --serve-root`);
+  const refused = new Set();
+  const server = createServer((req, res) => {
+    const deny = (code, why) => { res.writeHead(code, { 'Content-Type': 'text/plain' }); res.end(why); };
+    if (req.method !== 'GET' && req.method !== 'HEAD') return deny(405, 'GET and HEAD only');
+    let file;
+    try {
+      const name = decodeURIComponent(new URL(req.url, 'http://127.0.0.1').pathname);
+      if (name.includes('\0')) return deny(400, 'bad path');
+      file = resolve(root, '.' + name);
+      if (!within(root, file)) throw Object.assign(new Error('outside'), { code: 'OUTSIDE' });
+      file = realpathSync(file);                         // a symlink inside the folder may not point out of it
+      if (!within(root, file)) throw Object.assign(new Error('outside'), { code: 'OUTSIDE' });
+    } catch (e) {
+      if (e.code === 'OUTSIDE') {
+        if (!refused.has(req.url)) { refused.add(req.url); log(`refused (outside ${root}): ${req.url}; set --serve-root to a folder that holds it`); }
+        return deny(403, 'outside the served folder');
+      }
+      return deny(404, 'not found');
+    }
+    let st;
+    try { st = statSync(file); } catch { return deny(404, 'not found'); }
+    if (!st.isFile()) return deny(404, 'not found');
+    const headers = { 'Content-Type': MIME[extname(file).toLowerCase()] || 'application/octet-stream',
+      'Cache-Control': 'no-store', 'Accept-Ranges': 'bytes', 'X-Content-Type-Options': 'nosniff' };
+    let start = 0, end = st.size - 1, code = 200;
+    const range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+    if (range && (range[1] || range[2])) {
+      if (range[1]) { start = +range[1]; if (range[2]) end = Math.min(+range[2], st.size - 1); }
+      else start = Math.max(0, st.size - +range[2]);    // bytes=-N: the last N bytes
+      if (start > end || start >= st.size) {
+        res.writeHead(416, { 'Content-Range': `bytes */${st.size}` });
+        return res.end();
+      }
+      code = 206;
+      headers['Content-Range'] = `bytes ${start}-${end}/${st.size}`;
+    }
+    headers['Content-Length'] = st.size ? end - start + 1 : 0;
+    res.writeHead(code, headers);
+    if (req.method === 'HEAD' || st.size === 0) return res.end();
+    createReadStream(file, { start, end }).on('error', () => res.destroy()).pipe(res);
+  });
+  await new Promise((ok, fail) => { server.once('error', fail); server.listen(0, '127.0.0.1', ok); });
+  server.unref();                                       // never keeps the capture alive on its own
+  process.on('exit', () => { try { server.close(); } catch { /* already closed */ } });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  served = { origin, root };
+  const u = new URL(fileUrl);
+  const path = relative(root, realPage).split(sep).map(encodeURIComponent).join('/');
+  return { url: `${origin}/${path}${u.search}${u.hash}` };
+}
+
+// A loaded URL as a local file: file:// URLs, and URLs from this capture's own server.
+function localPath(u) {
+  try {
+    if (u.startsWith('file:')) return fileURLToPath(new URL(u));
+    if (served && u.startsWith(served.origin + '/')) {
+      const p = resolve(served.root, '.' + decodeURIComponent(new URL(u).pathname));
+      return within(served.root, p) && existsSync(p) && statSync(p).isFile() ? p : null;
+    }
+  } catch { /* not a local file */ }
+  return null;
 }
 
 function findChrome() {
