@@ -44,6 +44,13 @@ def ebur128(path):
     return vals
 
 
+def dur(path):
+    """Duration in seconds from ffprobe (0 if it cannot be read)."""
+    out = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
+                          "csv=p=0", path], capture_output=True, text=True).stdout.strip()
+    return float(out or 0)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("mix")
@@ -69,8 +76,13 @@ def main():
         silent = True
     if silent:                                                        # nothing to normalise: keep the length, say why
         if a.video:
+            vd = dur(a.video)
             cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", a.video, "-i", a.mix, "-map", "0:v:0",
                    "-map", "1:a:0", "-c:v", "copy", "-af", "apad", "-c:a", "aac", "-b:a", "128k", "-shortest", a.output]
+            if vd > 0:
+                # apad with no bound pads forever and -shortest does not stop it (ffmpeg 7.x hangs):
+                # cap the output at the picture's length, which is what -shortest was meant to do.
+                cmd[-1:-1] = ["-t", f"{vd:.3f}"]
         else:
             cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-y", "-i", a.mix, "-c:a", "pcm_s24le", a.output]
         subprocess.run(cmd, check=True)
@@ -104,8 +116,6 @@ def main():
               f"measured_LRA={m['input_lra']}:measured_thresh={m['input_thresh']}:offset={m['target_offset']}:"
               f"linear=true:print_format=json")
         if a.video:
-            dur = lambda f: float(subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of",
-                                                  "csv=p=0", f], capture_output=True, text=True).stdout.strip() or 0)
             vd, md = dur(a.video), dur(a.mix)
             if attempt == 0 and abs(vd - md) > 0.1:
                 print(f"WARNING: the mix is {md:.2f} s and the picture {vd:.2f} s; the picture keeps its length "
@@ -114,6 +124,10 @@ def main():
             cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-y", "-i", a.video, "-i", a.mix, "-map", "0:v:0", "-map", "1:a:0",
                    "-c:v", "copy", "-af", af, "-c:a", "aac", "-b:a", "320k", "-ar", "48000", "-movflags", "+faststart",
                    "-shortest", a.output]
+            if vd > 0:
+                # apad with no bound pads forever and -shortest does not stop it (ffmpeg 7.x hangs):
+                # cap the output at the picture's length, which is what -shortest was meant to do.
+                cmd[-1:-1] = ["-t", f"{vd:.3f}"]
         else:
             cmd = ["ffmpeg", "-hide_banner", "-nostdin", "-y", "-i", a.mix, "-af", af, "-ar", "48000",
                    "-c:a", "pcm_s24le", a.output]
