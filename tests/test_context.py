@@ -2457,6 +2457,27 @@ console.log(JSON.stringify({ ahead, farScale: far[2], nearScale: near[2], behind
         run = subprocess.run([sys.executable, str(ROOT / "scripts" / "validate_shots.py"), str(p)], capture_output=True, text=True)
         self.assertNotIn("FAILED", run.stdout + run.stderr)
 
+    def test_a_malformed_window_is_an_error_not_a_traceback(self):
+        p = self.root / "shots.json"
+        shot = {"id": "S01", "start": 0, "end": 48, "description": "a cup", "action": "a cup spins",
+                "reads": [{"read": "a cup", "t": [0, 2]}], "camera": "locked, 2 s", "action_from_frame_1": True}
+        for bad_t in ([0.5], 2.5, ["a", "b"], ["0", "3"]):
+            film = {"title": "T", "fps": 24, "width": 1080, "height": 1920, "duration_frames": 48,
+                    "shots": [dict(shot, reads=[{"read": "a cup", "t": bad_t}])]}
+            p.write_text(json.dumps(film), encoding="utf-8")
+            run = subprocess.run([sys.executable, str(ROOT / "scripts" / "validate_shots.py"), str(p)],
+                                 capture_output=True, text=True)
+            self.assertEqual(run.returncode, 1, bad_t)
+            self.assertIn("window", run.stdout + run.stderr, bad_t)
+            self.assertNotIn("Traceback", run.stdout + run.stderr, bad_t)
+        film = {"title": "T", "fps": 24, "width": 1080, "height": 1920, "duration_frames": 48,
+                "shots": [dict(shot, reads=[{"read": "a cup", "t": ["0", "2"]}])]}
+        p.write_text(json.dumps(film), encoding="utf-8")                       # numeric strings are a valid window
+        run = subprocess.run([sys.executable, str(ROOT / "scripts" / "validate_shots.py"), str(p)],
+                             capture_output=True, text=True)
+        self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
+        self.assertIn("0 error(s)", run.stdout)
+
     def test_a_final_reads_the_independent_viewer_and_waits_only_briefly(self):
         import argparse, time
         renders, review = self.root / "renders", self.root / "review"
@@ -3323,6 +3344,15 @@ console.log(JSON.stringify({ ahead, farScale: far[2], nearScale: near[2], behind
         self.assertEqual(validate_shots.camera_move({"camera": "truck, 3 s, slow ease-in-out"})["type"], "move")
         self.assertEqual(validate_shots.camera_move({"camera": {"move": "locked, 2 s"}})["type"], "locked")
         self.assertEqual(validate_shots.camera_move({}), {})
+
+    def test_a_window_parses_pairs_strings_and_text(self):
+        import validate_shots
+        self.assertEqual(validate_shots.window([0, 2]), [0.0, 2.0])
+        self.assertEqual(validate_shots.window(["0", "2"]), [0.0, 2.0])
+        self.assertEqual(validate_shots.window("0.4-3.0"), [0.4, 3.0])
+        self.assertEqual(validate_shots.window("0.4 - 3.0"), [0.4, 3.0])
+        for bad in ([0.5], 2.5, ["a", "b"], "hello", None, [0, 2, 3], {"a": 1}):
+            self.assertIsNone(validate_shots.window(bad), bad)
 
     def test_words_check_stops_on_a_dash_and_flags_generated_lines(self):
         import words_check

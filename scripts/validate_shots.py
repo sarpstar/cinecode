@@ -43,6 +43,25 @@ def camera_move(shot):
     return move if isinstance(move, dict) else {}
 
 
+def window(t):
+    """A [start, end] window in seconds, or None when the value is malformed.
+
+    Accepts a [start, end] pair of numbers (numeric strings included) or a
+    "start-end" text window; anything else is malformed, never a crash.
+    """
+    if isinstance(t, str):
+        parts = [p.strip() for p in t.split("-")]   # "0.4-3.0": the dash is the separator, not a sign
+        if len(parts) != 2 or not parts[0] or not parts[1]:
+            return None
+        t = parts
+    if not isinstance(t, (list, tuple)) or len(t) != 2:
+        return None
+    try:
+        return [float(t[0]), float(t[1])]
+    except (TypeError, ValueError):
+        return None
+
+
 def rhythm(shots, fps, warn):
     """Tempo must move: shot lengths that are all alike, or acts that keep one pace, read as monotony."""
     d = [((s.get("end") or 0) - (s.get("start") or 0)) / fps for s in shots if isinstance(s.get("end"), int)]
@@ -183,8 +202,10 @@ def main(path):
         if not reads:
             err(f"{sid}: no reads (what must the viewer understand here?)")
         for r in reads:
-            t = r.get("t") or [None, None]
-            if t[0] is None or t[1] is None or t[1] <= t[0] or t[0] < -1e-6 or t[1] > dur + 1e-6:
+            t = window(r.get("t"))
+            if t is None:
+                err(f"{sid}: read '{str(r.get('read', ''))[:40]}' window {r.get('t')!r} is invalid or outside 0-{dur:.2f} s")
+            elif t[1] <= t[0] or t[0] < -1e-6 or t[1] > dur + 1e-6:
                 err(f"{sid}: read '{str(r.get('read', ''))[:40]}' window {t} is invalid or outside 0-{dur:.2f} s")
             elif t[1] - t[0] < 0.5:
                 warn(f"{sid}: read '{str(r.get('read', ''))[:40]}' gets only {t[1] - t[0]:.2f} s")
@@ -196,14 +217,13 @@ def main(path):
 
         for tx in s.get("text_on_screen") or []:
             words = len(str(tx.get("text", "")).split())
-            t = tx.get("t") or [0, 0]
-            if isinstance(t, str):                     # "0.4-3.0" written as text
-                t = [float(x) for x in __import__("re").findall(r"\d+(?:\.\d+)?", t)][:2] or [0, 0]
-            t = [float(x) for x in t] if len(t) == 2 and all(isinstance(x, (int, float, str)) for x in t) else [0, 0]
+            t = window(tx.get("t"))
             need = 0.6 + 0.25 * words
             if words > TEXT_MAX_WORDS:
                 err(f"{sid}: on-screen text '{tx.get('text')}' has {words} words (max {TEXT_MAX_WORDS})")
-            if t[0] < -1e-6 or t[1] > dur + 1e-6 or t[1] <= t[0]:
+            if t is None:
+                err(f"{sid}: on-screen text '{tx.get('text')}' window {tx.get('t')!r} is invalid or outside 0-{dur:.2f} s")
+            elif t[0] < -1e-6 or t[1] > dur + 1e-6 or t[1] <= t[0]:
                 err(f"{sid}: on-screen text '{tx.get('text')}' window {t} is invalid or outside 0-{dur:.2f} s")
             elif t[1] - t[0] + 1e-6 < need:
                 err(f"{sid}: on-screen text '{tx.get('text')}' is shown {t[1] - t[0]:.2f} s, needs {need:.2f} s")
@@ -219,12 +239,13 @@ def main(path):
     total = prev_end or 0
     for tx in film.get("text_on_screen") or []:      # the film's own text track: words that span beats (a one-shot film)
         words = len(str(tx.get("text", "")).split())
-        t = tx.get("t") or [0, 0]
-        t = [float(x) for x in t] if isinstance(t, list) and len(t) == 2 and all(isinstance(x, (int, float)) for x in t) else [0, 0]
+        t = window(tx.get("t"))
         need = 0.6 + 0.25 * words
         if words > TEXT_MAX_WORDS:
             err(f"film text '{tx.get('text')}' has {words} words (max {TEXT_MAX_WORDS})")
-        if t[0] < -1e-6 or t[1] > total / fps + 1e-6 or t[1] <= t[0]:
+        if t is None:
+            err(f"film text '{tx.get('text')}' window {tx.get('t')!r} is invalid or outside 0-{total / fps:.2f} s")
+        elif t[0] < -1e-6 or t[1] > total / fps + 1e-6 or t[1] <= t[0]:
             err(f"film text '{tx.get('text')}' window {t} is invalid or outside 0-{total / fps:.2f} s")
         elif t[1] - t[0] + 1e-6 < need:
             err(f"film text '{tx.get('text')}' is shown {t[1] - t[0]:.2f} s, needs {need:.2f} s")
