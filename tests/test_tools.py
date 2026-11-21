@@ -279,6 +279,24 @@ class Tools(unittest.TestCase):
         self.assertIn('"city, traffic, night" by Ann on Pixabay (Pixabay Content License)',
                       (self.path / "Film-credits.txt").read_text(encoding="utf-8"))
 
+    def test_stills_names_a_missing_page_and_the_film_option(self):
+        import argparse
+        import make
+        a = argparse.Namespace(film="film.html", size=None, at=None, workers="2")
+        out = io.StringIO()
+        with patch.object(make, "PROJECT", self.path), patch.object(make, "LOGS", self.path / "logs"), \
+                contextlib.redirect_stdout(out), self.assertRaises(SystemExit) as stop:
+            make.stills(a)
+        self.assertEqual(stop.exception.code, 2)
+        self.assertIn("FAILED: no film.html", out.getvalue())
+        self.assertIn("--film PATH", out.getvalue())
+
+    def test_check_accepts_the_film_option(self):
+        out = subprocess.run([sys.executable, str(ROOT / "scripts/make.py"), "check", "--help"],
+                             capture_output=True, text=True, timeout=30)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertIn("--film", out.stdout)
+
     def test_a_short_wait_skips_a_stalled_source_cleanly(self):
         import socket, urllib.error
         asset_search.MAX_WAIT[0] = 0.5

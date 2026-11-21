@@ -10,6 +10,8 @@ Options:
   --sound-only     reuse the last picture of that step and render only the sound (a note about sound alone)
   --size WxH       full frame size (default: the "WxH" on the Format line of STATE.md, else the page's own)
   --workers N      parallel Chrome pages (default 2)       --poster S   poster time (default: 70% of the runtime)
+  --film PATH      the page, relative to the project folder (default film.html), e.g. engine/film.html
+  python3 tools/make.py check renders/draft-vN.mp4 [--film PATH]   Film mode: the draft checks on a rendered cut
 Sound: the page's soundtrack is always captured to audio/film.wav. With audio/mix.json (narration, sound.md) that
 file takes the place of the plan's music layer, mix.py mixes the plan into audio/mix-<version>.wav (its own "out" is
 not used) and that is mastered; otherwise audio/film.wav is. The user's own song (OWN_MUSIC) is only ever read.
@@ -1489,7 +1491,7 @@ def render(a, kind):
     state = state_text()
     film = a.film
     if not (PROJECT / film).exists():
-        finish([f"FAILED: no {film} in {PROJECT}"], 2)
+        finish([f"FAILED: no {film} in {PROJECT} (another page: --film PATH)"], 2)
     full = frame_size(a.size)
     info = probe(step, film, full)
     W, H = full or (info["w"], info["h"])
@@ -1648,6 +1650,8 @@ def render(a, kind):
 def stills(a):
     if unplugged_line():
         finish([unplugged_line()], 2)
+    if not (PROJECT / a.film).exists():
+        finish([f"FAILED: no {a.film} in {PROJECT} (another page: --film PATH)"], 2)
     step = Step("stills")
     words = words_line()
     full = frame_size(a.size)
@@ -1749,13 +1753,13 @@ def check(a):
             "the first 2 s (film-mode.md, writing.md)") if dur > 60 and voice and min(voice) > 2 else ""
     named = {"TOO DARK": too_dark_line(video), "BLANK FRAMES": blank_line(video, qc_dir / "report.txt"),
              "AI PALETTE": ai_palette_line(video), "SOUND THIN": sound_thin_line(info, plan, state),
-             "SOUND ALL CODE": sound_source_line(PROJECT / "film.html", plan, state), "SOUND LATE": sound_sync_line(plan),
+             "SOUND ALL CODE": sound_source_line(PROJECT / a.film, plan, state), "SOUND LATE": sound_sync_line(plan),
              "AV OFFSET": av_start_line(video),
              "SOUND BURIED": sound_buried_line(plan, PROJECT / next((L.get("file", "") for L in (plan or {}).get("layers", [])
                                                                      if L.get("bus") == "music"), "-"))}
     spans = voice_spans(plan)
     named["ENDING SHORT"] = ending_line(spans + words_before_card(dur), dur)
-    named["MUSIC NOT CHOSEN"] = music_choice_line(PROJECT / "film.html", plan, state)
+    named["MUSIC NOT CHOSEN"] = music_choice_line(PROJECT / a.film, plan, state)
     rests = rests_line(video, spans, dur, bounds, text_spans())
     rhythm = rhythm_line(bounds, state) if len(bounds) > 2 else ""
     if "EVEN RHYTHM" in rhythm:
@@ -1811,6 +1815,8 @@ def main():
         ap.add_argument("cmd", choices=["check", "credits"])
         ap.add_argument("video", nargs="?", help="check: the cut, e.g. renders/draft-v3.mp4")
         ap.add_argument("--title", help="credits: the film's title (default: STATE.md's)")
+        ap.add_argument("--film", default="film.html", help="check: the page, relative to the project folder "
+                        "(default film.html), for the checks that read its source")
         a = ap.parse_args()
         if a.cmd == "check" and not a.video:
             ap.error("check needs the cut: make.py check renders/draft-vN.mp4")
@@ -1819,7 +1825,7 @@ def main():
         return check(a) if a.cmd == "check" else credits_cmd(a)
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("step", choices=["stills", "draft", "final"])
-    ap.add_argument("--film", default="film.html")
+    ap.add_argument("--film", default="film.html", help="the page, relative to the project folder (default film.html)")
     ap.add_argument("--size", help="WxH; another aspect than STATE.md's format becomes a variant (<Title>-1x1.mp4)")
     ap.add_argument("--variant", help="name the variant yourself (default: the aspect, e.g. 1x1)")
     ap.add_argument("--workers", default="2")

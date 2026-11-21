@@ -262,6 +262,9 @@ writeStatus();
 log(`done: ${done} rendered, ${skipped} skipped, ${secs.toFixed(1)} s total, ${(done / secs).toFixed(2)} fps, ${chunks.length} worker(s)`);
 if (out) log(`frames: ${out}/%06d.${ext}`);
 if (enc) log(`video: ${resolve(args.video)} (${total} frames @ ${info.fps} fps, no audio yet)`);
+// Exit here, as every other mode does: a Chrome that is slow to go after SIGTERM keeps its stderr pipe open, so the
+// event loop never empties and the 'exit' handler that SIGKILLs it never runs (the run prints done and hangs).
+process.exit(0);
 
 // ---------------------------------------------------------------------------
 
