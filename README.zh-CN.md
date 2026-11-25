@@ -11,6 +11,7 @@
   <a href="README.md">Türkçe</a> ·
   <a href="README.en.md">English</a> ·
   <a href="README.ja.md">日本語</a> ·
+  <a href="README.vi.md">Tiếng Việt</a> ·
   <a href="#安装">安装</a> ·
   <a href="#快速开始">快速开始</a> ·
   <a href="#常见问题">常见问题</a>

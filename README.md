@@ -11,6 +11,7 @@
   <a href="README.en.md">English</a> ·
   <a href="README.zh-CN.md">简体中文</a> ·
   <a href="README.ja.md">日本語</a> ·
+  <a href="README.vi.md">Tiếng Việt</a> ·
   <a href="#kurulum">Kurulum</a> ·
   <a href="#hızlı-başlangıç">Hızlı başlangıç</a> ·
   <a href="#sss">SSS</a>
