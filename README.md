@@ -284,7 +284,7 @@ cinecode/
 │   ├── qc.py             kalite kontrolleri; scene_check.py, words_check.py ile
 │   └── guard.py          bekçi: kuralları anında uygular (hook.cjs ile, Claude Code)
 ├── templates/            yeni bir filmin dosyaları ve Hızlı mod başlangıç sayfası
-├── starter/              three.js sahnesi: sekiz görünüm, adlandırılmış kamera hareketleri, yazı katmanı
+├── starter/              three.js sahnesi: sekiz görünüm, adlandırılmış kamera hareketleri, yazı katmanı; timing.js müzik videosu için bölüm + vuruş saati
 ├── styles/               58 stil tarifi (51'i lemo-opuscar, MIT; 7'si kitin kendi)
 ├── docs/                 README görselleri ve font kütüphanesi
 └── tests/                her gönderimde Windows ve Linux'ta çalışan test takımı
