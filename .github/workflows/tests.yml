@@ -1,0 +1,87 @@
+name: tests
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: ffmpeg
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            choco install ffmpeg -y --no-progress || true
+            if ! command -v ffmpeg >/dev/null; then
+              curl -fsSL -o "$RUNNER_TEMP/ffmpeg.zip" \
+                https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
+              7z x -y -o"$RUNNER_TEMP/ffmpeg" "$RUNNER_TEMP/ffmpeg.zip" >/dev/null
+              bin="$(ls -d "$RUNNER_TEMP"/ffmpeg/*/bin)"
+              cygpath -w "$bin" >> "$GITHUB_PATH"
+              export PATH="$bin:$PATH"
+            fi
+          else
+            sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+          fi
+          ffmpeg -hide_banner -version >/dev/null && ffprobe -hide_banner -version >/dev/null && echo "ffmpeg ready"
+      - name: tests
+        shell: bash
+        env:
+          CINECODE_BROWSER_TESTS: "1"
+          CINECODE_NO_OPEN: "1"
+          PYTHONUTF8: "1"
+        run: |
+          export CINECODE_SPARKS="$RUNNER_TEMP/sparks.json"
+          python -m unittest discover -s tests -v
+
+  windows-no-bash:
+    name: windows, no Git or bash
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: ffmpeg
+        shell: pwsh
+        run: |
+          choco install ffmpeg -y --no-progress
+          if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
+            Invoke-WebRequest https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip -OutFile "$env:RUNNER_TEMP\ffmpeg.zip"
+            Expand-Archive "$env:RUNNER_TEMP\ffmpeg.zip" "$env:RUNNER_TEMP\ffmpeg"
+            $bin = (Get-ChildItem "$env:RUNNER_TEMP\ffmpeg\*\bin").FullName
+            Add-Content $env:GITHUB_PATH $bin
+            $env:PATH = "$bin;$env:PATH"
+          }
+          ffmpeg -hide_banner -version | Out-Null; ffprobe -hide_banner -version | Out-Null; "ffmpeg ready"
+      - name: tests, with Git and its bash taken off PATH (as on a Windows computer with only Claude Code)
+        shell: pwsh
+        env:
+          CINECODE_BROWSER_TESTS: "1"
+          CINECODE_NO_OPEN: "1"
+          PYTHONUTF8: "1"
+        run: |
+          $env:PATH = ($env:PATH -split ';' | Where-Object { $_ -and $_ -notmatch '\\Git\\|\\Git$|msys|cygwin' }) -join ';'
+          $env:CINECODE_SPARKS = "$env:RUNNER_TEMP\sparks.json"
+          if (Get-Command git -ErrorAction SilentlyContinue) { throw "git is still on PATH" }
+          $bash = Get-Command bash -ErrorAction SilentlyContinue
+          if ($bash -and $bash.Source -notmatch 'System32') { throw "a bash is still on PATH: $($bash.Source)" }
+          python -m unittest discover -s tests -v
