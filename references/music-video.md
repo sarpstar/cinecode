@@ -32,4 +32,28 @@ The mode and purpose questions come first (one call; the purpose is ★ Cinemati
 
 Chapters follow `quick-mode.md` §7 (one file, one function per scene, `chapter` on each scene) or Film mode (one shot list grouped by section). Write each chapter's beat times as a comment at its top (`// bar(8) = 15.74 s · bar(12) = 23.61 s`) so hits land exactly. In Film mode, chapters can go to parallel helpers with the same brief (`context-protocol.md`), after one chapter is finished as the reference; the seams between chapters are checked together at the end.
 
+## 5. Retiming: one cue file per take
+
+When the song is re-recorded, every hard-coded second in the page has to move. Write the choreography against the song's grid instead, and keep the grid itself in one file per take: `audio/cues.json`.
+
+```json
+{
+  "bpm": 120, "beatsPerBar": 4, "beat0": 0,
+  "sections": [
+    { "name": "intro", "bar": 0 },
+    { "name": "verse", "bar": 8 },
+    { "name": "chorus", "bar": 24 }
+  ],
+  "bars": [0, 1.9, 3.8],
+  "lines": [{ "text": "first line", "bar": 8, "beat": 0 }]
+}
+```
+
+- `bpm`, `beatsPerBar`, `beat0`: the tempo, the beats in a bar (3 for a 6/8 read as three beats, or a waltz), and the film time of beat 0. Bar and beat numbers are 0-based, like `film.html`'s `bar(n)` / `beat(n)`.
+- `sections`: the song's chapters, each starting on a bar. Choreography is written as section + beat (`at('chorus', 2)`), never as seconds.
+- `bars`: measured bar-start times, when the grid is not a metronome — copy them from `beat_grid.py --json audio/beats.json` (film time: subtract the song time of film 0), or from an outside beat analysis. Beats inside a bar interpolate; past the table the last measured bar length carries on.
+- `lines`: lyric lines with their bar and beat, for on-screen type.
+
+The page reads the file through `starter/timing.js` (`createClock(cues)`): `bar(n)`, `beat(n)`, `section(name)`, `at(section, beat)`, `sectionAt(t)`, `lineTime(line)`. The clock returns picture times: the picture leads the beat by `pictureLeadMs` (45 ms — a hit placed exactly on the beat reads late) and lyric lines appear `lyricLeadMs` (130 ms) before the first word. Both are in the file, so a take that needs different offsets says so there. A new take means a new `audio/cues.json` (and the cut `audio/music.wav`); the page does not change.
+
 Method and lessons after [tuzhechen2005/opus-video-skills](https://github.com/tuzhechen2005/opus-video-skills) (MIT), which credits John Heibel's ClaudeAnimationBase and P(doom) video.

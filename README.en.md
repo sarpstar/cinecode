@@ -284,7 +284,7 @@ cinecode/
 │   ├── qc.py             quality checks; with scene_check.py, words_check.py
 │   └── guard.py          the guard: enforces the rules on the spot (with hook.cjs, Claude Code)
 ├── templates/            a new film's files and the Quick mode starter page
-├── starter/              the three.js scene: eight looks, named camera moves, a type layer
+├── starter/              the three.js scene: eight looks, named camera moves, a type layer; timing.js is the music-video cue clock (section + beat)
 ├── styles/               58 style recipes (51 from lemo-opuscar, MIT; 7 the kit's own)
 ├── docs/                 README images and the font library
 └── tests/                the test suite, run on Windows and Linux on every push
