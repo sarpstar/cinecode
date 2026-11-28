@@ -18,10 +18,13 @@ action  Subject action per scene: camera motion alone is not a scene. Frames are
         median residual stays under --min (0-255 grey levels: nothing acts) or under --share of the total change
         (the camera carries the scene, the subject barely acts). Parallax between depth planes counts as residual,
         so a passing scene is still checked on its strip. The first and last 0.2 s of each scene are skipped.
+        --calm (quick-mode.md §2): a slow camera move carrying the verse is the scene, so only a scene where
+        nothing moves at all is flagged.
 sound   Per-scene integrated loudness (EBU R128) and the harsh-band ratio: energy in 2-5 kHz relative to the whole
         signal, in dB. Flags a scene more than --max-lu LU away from the median scene (a quiet scene before the
         peak can be intentional: say so) and a scene whose harsh-band ratio is more than --max-harsh dB above the
-        median (fatiguing leads, bright synthetic winds or brass, raw saw waves).
+        median (fatiguing leads, bright synthetic winds or brass, raw saw waves). --calm: a silent scene is a
+        flag too (a held soft chord reads better than a gap).
 
 pops    Every frame at 48 px wide in grey: frame n is a pop when it differs from both neighbours (each step >= 4 grey
         levels) while the neighbours match each other (their difference under 35 % of the smaller step): a stray
@@ -166,7 +169,8 @@ def do_action(args):
     al = Aligner(w, h)
     flagged = 0
     print(f"== action per scene (camera move removed; flag when the median residual < {args.min} "
-          f"or < {args.share:.0%} of the total; {args.fps:g} samples/s):")
+          f"or < {args.share:.0%} of the total; {args.fps:g} samples/s)"
+          + (" [calm: only a scene where nothing moves at all]" if args.calm else "") + ":")
     for name, a, b in scenes_from(args, duration):
         i0, i1 = int((a + EDGE_S) * args.fps + 0.999), int((b - EDGE_S) * args.fps)
         pairs = [(frames[i - 1], frames[i]) for i in range(max(1, i0 + 1), min(len(frames), i1 + 1))]
@@ -176,7 +180,7 @@ def do_action(args):
         vals = [al.residual(p, q) for p, q in pairs]
         raw = statistics.median(v[0] for v in vals)
         res = statistics.median(v[1] for v in vals)
-        flag = res < args.min or res < args.share * raw
+        flag = raw < args.min if args.calm else (res < args.min or res < args.share * raw)
         flagged += flag
         verdict = ("CHECK: nothing moves" if raw < args.min else "CHECK: camera-led, the subject barely acts") if flag else "ok"
         print(f"  {name:>5} {stamp(a)}-{stamp(b)}  residual {res:5.2f}  total {raw:5.2f}  {verdict}")
@@ -225,7 +229,7 @@ def do_sound(args):
             notes.append(f"{'LOUDER' if lufs > med_l else 'QUIETER'} by {abs(lufs - med_l):.1f} LU")
         if hr is not None and lufs > -60 and hr - med_h > args.max_harsh:
             notes.append(f"HARSH: 2-5 kHz {hr - med_h:+.1f} dB over the median")
-        flagged += bool(notes) and not (lufs <= -60)
+        flagged += bool(notes) and (args.calm or not (lufs <= -60))   # calm: silence is a flag, not a note
         hs = f"{hr:+5.1f} dB" if hr is not None else "   n/a  "
         print(f"  {name:>5} {stamp(a)}-{stamp(b)}  {lufs:6.1f} LUFS  harsh {hs}  {'; '.join(notes) or 'ok'}")
     print(f"  {flagged} scene(s) flagged" + ("; listen to those seconds, then fix the level or soften the lead" if flagged else ""))
@@ -355,6 +359,8 @@ def main():
     ap.add_argument("--max-lu", type=float, default=3.0, help="sound: largest deviation from the median scene (LU)")
     ap.add_argument("--repeat-mad", type=float, default=5.0, help="repeats: largest mean grey difference (0-255)")
     ap.add_argument("--max-harsh", type=float, default=3.0, help="sound: largest harsh-band rise over the median (dB)")
+    ap.add_argument("--calm", action="store_true", help="calm profile: action flags only a scene where nothing moves; "
+                                                        "sound flags silent scenes too")
     args = ap.parse_args()
     if not os.path.isfile(args.input):
         sys.exit(f"scene_check: no such file: {args.input}")

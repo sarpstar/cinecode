@@ -24,7 +24,7 @@ The mode and purpose questions come first (one call; the purpose is ★ Cinemati
 - **One idea for the whole video**, one paragraph, before any shot: what world, what changes, how it ends.
 - **Chapters are the song's sections** (intro, verse, chorus, bridge, outro). Each gets one setting and a small palette of its own inside the film's look.
 - **A thread that ties it together:** a recurring set, a motif that changes, a palette arc or one rule for transitions.
-- **One visual per lyric line**, 1.5–4 s; the shot table gets a lyric column and an **Out** column naming how each shot leaves. When an idea needs more time than its line, carry it into the next line instead of slowing the song.
+- **One visual per lyric line**, 1.5–4 s; the shot table gets a lyric column and an **Out** column naming how each shot leaves. When an idea needs more time than its line, carry it into the next line instead of slowing the song. A sing-along for very young children is the exception: one continuous shot per verse, 7 s or more, with `Tempo: calm` on the director card (`quick-mode.md` §2).
 - **Act the lyric, do not write it.** Each line becomes an action that shows its meaning; no signs or captions repeating the words (on-screen lyrics, if wanted, are a separate typographic layer).
 - A handful of big sound moments across the whole video; the song does the rest.
 

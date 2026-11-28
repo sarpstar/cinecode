@@ -265,7 +265,8 @@ def tempo_card(state):
     return re.search(r"\*\*Tempo[^*]*\*\*\s*([^·\n]+)", state, re.I) or re.search(r"\btempo\b:?\s*([^·\n]+)", state, re.I)
 
 
-TEMPO = {"energetic": 4, "enerjik": 4, "tempolu": 4, "standard": 6, "standart": 6, "contemplative": 10, "sakin": 10}
+TEMPO = {"energetic": 4, "enerjik": 4, "tempolu": 4, "standard": 6, "standart": 6, "contemplative": 10, "sakin": 10,
+         "calm": 8}
 
 
 def rhythm_line(bounds, state):
@@ -278,10 +279,11 @@ def rhythm_line(bounds, state):
     spread = (sum((x - mean) ** 2 for x in lens) / len(lens)) ** 0.5 / mean
     notes = []
     alike = max(sum(1 for x in lens if abs(x - y) <= 0.15 * y) for y in lens)
-    if len(lens) >= 6 and (spread < 0.2 or alike > 0.6 * len(lens)):     # a few long scenes may well match
+    card = tempo_card(state)
+    calm = bool(card and re.search(r"\bcalm\b", card[1], re.I))
+    if not calm and len(lens) >= 6 and (spread < 0.2 or alike > 0.6 * len(lens)):     # a few long scenes may well match
         notes.append(f"EVEN RHYTHM: {alike} of {len(lens)} scenes run about the same length (spread {spread:.2f}); "
                      "vary them with the beat types: short runs against long holds")
-    card = tempo_card(state)
     want = next((v for k, v in TEMPO.items() if card and re.search(rf"\b{k}\b", card[1], re.I)), None)
     if want and mean > want * 1.5:
         notes.append(f"TEMPO: the card says about {want} s a scene; the scenes average {mean:.1f} s")
@@ -527,7 +529,7 @@ def cliche_line(film, state):
             "it with its reason from this story; otherwise take it out (references/looks.md §8)") if used else ""
 
 
-CALM_MUSIC = r"ambient|tension|gerilim|drone|neoclassical|neo-classical|minimal piano|piano solo|solo piano|sakin|contemplative"
+CALM_MUSIC = r"ambient|tension|gerilim|drone|neoclassical|neo-classical|minimal piano|piano solo|solo piano|sakin|contemplative|calm"
 VOICES = r"\b(pad|drone|pluck|lead|bell|arp|kick|snare|hat|clap|sub808|bass|stab|swell|riser|organ|strings|choir)\s*\("
 KIT = {"kick", "snare", "hat", "clap", "bass", "sub808"}       # the rhythm section: every genre has one
 SHOWN_MUSIC = Path(os.environ.get("CINECODE_SHOWN_MUSIC") or Path.home() / ".cinecode" / "shown-music.json")

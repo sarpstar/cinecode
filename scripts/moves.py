@@ -20,22 +20,24 @@ import os
 import random
 import sys
 
-MOVES = {   # move: (energetic, standard, contemplative) weight
-    "dolly in": (2, 3, 3), "dolly out": (1, 2, 3), "push-in on detail": (3, 3, 2), "pull-back reveal": (2, 3, 3),
-    "truck with the subject": (3, 3, 1), "orbit": (3, 2, 1), "crane up": (1, 2, 3), "crane down": (1, 2, 2),
-    "pan": (2, 2, 2), "tilt": (1, 2, 2), "zoom in": (2, 1, 1), "FPV fly-through": (3, 1, 0),
-    "handheld drift": (2, 1, 1), "locked-off hold": (1, 2, 4), "rack focus": (1, 2, 3), "focus pull": (1, 2, 2),
+MOVES = {   # move: (energetic, standard, contemplative, calm) weight
+    "dolly in": (2, 3, 3, 3), "dolly out": (1, 2, 3, 2), "push-in on detail": (3, 3, 2, 1), "pull-back reveal": (2, 3, 3, 2),
+    "truck with the subject": (3, 3, 1, 2), "orbit": (3, 2, 1, 1), "crane up": (1, 2, 3, 3), "crane down": (1, 2, 2, 2),
+    "pan": (2, 2, 2, 2), "tilt": (1, 2, 2, 2), "zoom in": (2, 1, 1, 0), "FPV fly-through": (3, 1, 0, 0),
+    "handheld drift": (2, 1, 1, 0), "locked-off hold": (1, 2, 4, 4), "rack focus": (1, 2, 3, 2), "focus pull": (1, 2, 2, 1),
 }
-BIG = {"dolly zoom": (1, 1, 1), "speed ramp": (3, 2, 1), "freeze frame": (2, 2, 1), "time-lapse": (1, 2, 2)}
+BIG = {"dolly zoom": (1, 1, 1, 0), "speed ramp": (3, 2, 1, 0), "freeze frame": (2, 2, 1, 0), "time-lapse": (1, 2, 2, 0)}
 CUTS = {   # transition into the shot
-    "hard cut": (4, 5, 3), "match cut": (2, 3, 3), "whip pan": (3, 1, 0), "cross dissolve": (0, 1, 3),
-    "iris": (1, 1, 1), "wipe": (1, 1, 0), "smash cut": (2, 1, 1), "J-cut (sound first)": (1, 2, 2),
-    "L-cut (sound carries over)": (1, 2, 2),
+    "hard cut": (4, 5, 3, 0), "match cut": (2, 3, 3, 1), "whip pan": (3, 1, 0, 0), "cross dissolve": (0, 1, 3, 4),
+    "iris": (1, 1, 1, 0), "wipe": (1, 1, 0, 0), "smash cut": (2, 1, 1, 0), "J-cut (sound first)": (1, 2, 2, 2),
+    "L-cut (sound carries over)": (1, 2, 2, 2),
 }
 ONCE = {"smash cut", "iris", "wipe"}
 SIZES = ["wide", "medium", "close", "extreme close", "macro"]
-SPEED = {"energetic": ["fast", "medium"], "standard": ["medium", "slow"], "contemplative": ["slow", "very slow"]}
-TEMPO = {"energetic": 0, "enerjik": 0, "tempolu": 0, "standard": 1, "standart": 1, "contemplative": 2, "sakin": 2}
+SPEED = {"energetic": ["fast", "medium"], "standard": ["medium", "slow"], "contemplative": ["slow", "very slow"],
+         "calm": ["slow", "very slow"]}
+TEMPO = {"energetic": 0, "enerjik": 0, "tempolu": 0, "standard": 1, "standart": 1, "contemplative": 2, "sakin": 2,
+         "calm": 3}
 
 
 def memory_path():
@@ -76,12 +78,14 @@ def deal(shots, tempo, seed, lately):
     col = TEMPO.get(tempo.lower(), 1)
     rng = random.Random(int(hashlib.sha256(f"{seed}|{shots}|{tempo}|{sorted(lately)}".encode()).hexdigest(), 16))
     deck, used_once, big_at = [], set(), None
-    if shots >= 4:                                 # one big move, near the turn (60-75 % of the film)
+    if shots >= 4 and any(w[col] > 0 for w in BIG.values()):   # calm has no big move: nothing lands once
         big_at = min(shots - 1, max(1, round(shots * rng.uniform(0.55, 0.75))))
+    calm = tempo.lower() == "calm"
     for i in range(shots):
         prev = deck[-1] if deck else {}
         move = pick(rng, MOVES, col, avoid={prev.get("move")}, lately=lately if i == 0 else ())
-        size = rng.choice([s for s in SIZES if s != prev.get("size")])
+        sizes = SIZES if calm else [s for s in SIZES if s != prev.get("size")]   # calm: a held framing may return
+        size = rng.choice(sizes)
         cut = None if i == 0 else pick(rng, CUTS, col, avoid={prev.get("cut")} | used_once)
         if cut in ONCE:
             used_once.add(cut)
@@ -174,7 +178,7 @@ def main():
     sub = ap.add_subparsers(dest="cmd", required=True)
     p = sub.add_parser("deal", help="draw a deck for this film")
     p.add_argument("--shots", type=int, required=True)
-    p.add_argument("--tempo", default="standard", help="energetic · standard · contemplative (the card's tempo)")
+    p.add_argument("--tempo", default="standard", help="energetic · standard · contemplative · calm (the card's tempo)")
     p.add_argument("--seed", help="the idea in a few words (the same idea and memory give the same deck)")
     p.add_argument("--film", help="the film folder (default: here)")
     p.add_argument("--dry", action="store_true", help="do not remember this deck")

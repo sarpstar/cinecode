@@ -11,7 +11,7 @@ Every count in the kit follows the film's length; nothing is fixed at the 30-sec
 | 1–3 min | 5–45 | 4–8 of 15–30 s | 2 per chapter | 3–4 per chapter (12–30), one board per chapter | 3 + 2–3 per chapter |
 | 3–8 min (Film mode) | 15–120 | 8–20, grouped in 3–5 acts | 2 per chapter | 3–4 per chapter (30–70), one board per act | 2–3 per chapter, measured per act |
 
-- **Shots = runtime ÷ the average shot length**, chosen from the film's tempo: energetic about 4 s (8 min ≈ 120 shots), standard about 6 s (≈ 80), contemplative 8–12 s (≈ 40–60). The ranges in the table run from 12 s down to 4 s; state the chosen average in the roadmap. A long film breathes: its average can sit longer than a 30-second piece's, with faster stretches where the story runs.
+- **Shots = runtime ÷ the average shot length**, chosen from the film's tempo: energetic about 4 s (8 min ≈ 120 shots), standard about 6 s (≈ 80), contemplative 8–12 s (≈ 40–60), calm 7 s minimum and about 8 s and up (one shot per verse). The ranges in the table run from 12 s down to 4 s; state the chosen average in the roadmap. A long film breathes: its average can sit longer than a 30-second piece's, with faster stretches where the story runs.
 - **The direction board stays three rows** at any length: it chooses one visual language for the whole film, so it never grows; what grows is the coverage after the pick (per chapter, per act).
 - **Cost stays flat per decision:** boards are made per chapter or act, each at most 12 thumbnails; only one-line summaries are read, and the user sees the board of the chapter under discussion. A long film spends more references, never a bigger context.
 - Over 3 minutes is Film mode (Quick mode tops out at about 3 minutes, `quick-mode.md` §7).

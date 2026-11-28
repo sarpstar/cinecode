@@ -21,6 +21,8 @@
   qc.py pops   <video>                         one-frame flashes and pops (a frame unlike both neighbours)
   qc.py repeats <video>                        the same picture again 6 s or more later (one small frame a second)
   qc.py loop   <video>                         loop seam: does the last frame flow into the first? (looping films)
+  qc.py calm   <video> [min_shot=7]          calm profile (quick-mode.md §2): a slow open (hook at 0.1), every shot
+                                               >= min_shot seconds, no one-frame flashes; exit 1 on any flag
   qc.py all    <video>                         everything above that needs no extra arguments (loop only on request)
 
 Output goes to $QC_OUT (default: ./review/qc-<video name>/ inside a film, a temp folder outside one). Nothing is ever deleted.
@@ -70,11 +72,12 @@ def values(text, key):
     return [float(line.split("=")[1]) for line in text.splitlines() if f"{key}=" in line]
 
 
-def hook(inp, out, say, min_mean="0.5"):
+def hook(inp, out, say, min_mean="0.5", calm=False):
     # Mean luma difference between consecutive frames (160 px grey, 0-255) over the first 2 s.
     # Default mean >= 0.5 (grain or dust on a still frame measures about 0.2-0.3; a clear move 0.8-5).
     # A deliberately quiet long-form open (slow push-in, chosen by the user): min_mean=0.1. Every pair of steps has one
     # >= 0.02, so a look drawn on twos (each drawing held two frames) passes while a held still frame does not.
+    # Calm (min_mean 0.1): a slow move or a soft dissolve from frame 1 passes; a still title still fails.
     say(f"== hook (first 2 s must move from frame 1; min mean {min_mean}, motion >= 0.02 in every 2 frames):")
     _, text, _ = call(["ffmpeg", "-hide_banner", "-nostdin", "-v", "error", "-t", "2", "-i", inp, "-vf",
                        "scale=160:-2,format=gray,tblend=all_mode=difference,signalstats,"
@@ -87,8 +90,10 @@ def hook(inp, out, say, min_mean="0.5"):
     low = min(max(v[i:i + 2]) for i in range(max(1, len(v) - 1)))
     ok = mean >= float(min_mean) and low >= 0.02
     say(f"  steps={len(v)} mean={mean:.2f} min={low:.3f} first_step={max(v[:2]):.3f}")
-    say("  PASS" if ok else "  FAIL: open on the motion itself (camera move or action from frame 1); no still title, "
-        "no fade from black")
+    say("  PASS" if ok else ("  FAIL: open on the motion itself (camera move or action from frame 1); no still title, "
+                             "no fade from black" if not calm else
+                             "  FAIL: open on the motion itself (a slow move or a soft dissolve from frame 1); "
+                             "no still title"))
     say("  (also look at the strip: qc.py strip <video> 0 2 12, so grain or flicker is not mistaken for motion)")
     return 0 if ok else 1
 
@@ -220,15 +225,39 @@ def bright(inp, out, say, crop=""):
     return 0
 
 
-def cuts(inp, out, say, th="0.3"):
-    say(f"== hard cuts (scene score > {th}):")
+def cut_times(inp, th="0.3"):
     text = call(["ffmpeg", "-hide_banner", "-nostdin", "-loglevel", "error", "-i", inp, "-vf",
                  f"select='gt(scene,{th})',metadata=print:file=-", "-an", "-f", "null", "-"])[1]
-    ts = [float(x) for x in re.findall(r"pts_time:([0-9.]+)", text)]
+    return [float(x) for x in re.findall(r"pts_time:([0-9.]+)", text)]
+
+
+def cuts(inp, out, say, th="0.3"):
+    say(f"== hard cuts (scene score > {th}):")
+    ts = cut_times(inp, th)
     say(f"cuts: {len(ts)}")
     for t in ts:
         say(f"  {int(t // 60):02d}:{t % 60:06.3f}")
     return 0
+
+
+def calm(inp, out, say, min_shot="7"):
+    """Calm profile (quick-mode.md §2): a slow open is fine, but every shot still lasts and nothing flashes.
+    Dissolves are not detected as cuts, so dissolve-joined shots read as one long shot here; hard cuts are the
+    joints this counts."""
+    flagged = hook(inp, out, say, "0.1", calm=True)
+    ts = cut_times(inp)
+    dur = duration(inp)
+    bounds = [0.0] + ts + [dur]
+    lens = [b - a for a, b in zip(bounds, bounds[1:]) if b > a]
+    say(f"== calm shots (each >= {min_shot} s; {len(ts)} hard cut(s), dissolves read as one shot):")
+    for i, ln in enumerate(lens):
+        ok = ln >= float(min_shot)
+        flagged += not ok
+        say(f"  shot {i + 1} {bounds[i]:6.2f}-{bounds[i + 1]:6.2f}  {ln:5.2f} s  "
+            f"{'ok' if ok else 'CHECK: under ' + min_shot + ' s for a calm film'}")
+    flagged += scene("pops")(inp, out, say)
+    say(f"== calm: {'FAIL' if flagged else 'PASS'} (slow open, shots >= {min_shot} s, no one-frame flash)")
+    return 1 if flagged else 0
 
 
 def loud(inp, out, say):
@@ -272,7 +301,7 @@ def scene(kind):
 
 
 COMMANDS = {"hook": hook, "info": info, "sheet": sheet, "strip": strip, "phone": phone, "thumb": thumb, "black": black,
-            "freeze": freeze, "dup": dup, "bright": bright, "cuts": cuts, "loud": loud, "spec": spec,
+            "freeze": freeze, "dup": dup, "bright": bright, "cuts": cuts, "loud": loud, "spec": spec, "calm": calm,
             "action": scene("action"), "sceneloud": scene("sound"), "pops": scene("pops"), "repeats": scene("repeats"),
             "loop": scene("loop")}
 
