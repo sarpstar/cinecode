@@ -1,8 +1,14 @@
 #!/usr/bin/env python3
 """Check a shots.json against the cinecode film rules (Python 3 standard library only).
 
-Usage: python3 validate_shots.py shots.json
+Usage: python3 validate_shots.py shots.json [--calm]
 Exit code 1 on errors. Warnings do not fail; give each one a reason in STATE.md or fix it.
+
+Calm (--calm, or "tempo": "calm" in the file: a film for very young children, sleep or ambient loops,
+quick-mode.md §2): one continuous shot per verse, soft dissolves instead of cuts, shots of 7 s or more. The
+even-rhythm and repeated-framing rules are relaxed (even lengths and a returning framing are the look, not a
+fault), the hook may open slow (a soft dissolve, a held frame that starts to move), and the shot count fits
+an average of 7-20 s. The action rule stays: one main action per shot, named in "action".
 
 Checks
   structure   required fields, unique ids, integer frames, contiguous timing, duration_frames matches
@@ -31,6 +37,7 @@ MOVE_NAMES = ("pan", "tilt", "dolly in", "dolly out", "dolly zoom", "vertigo", "
               "orbit", "arc", "crane", "pedestal", "push-in", "pull-back", "fpv", "fly-through", "handheld", "slow motion",
               "speed ramp", "time-lapse", "freeze frame", "rack focus", "focus pull", "locked")
 LINE_MAX_WORDS = 9
+CALM = False            # --calm on the command line, or "tempo": "calm" in the file (set in main)
 
 
 def camera_move(shot):
@@ -43,9 +50,12 @@ def camera_move(shot):
     return move if isinstance(move, dict) else {}
 
 
-def rhythm(shots, fps, warn):
-    """Tempo must move: shot lengths that are all alike, or acts that keep one pace, read as monotony."""
+def rhythm(shots, fps, warn, calm=False):
+    """Tempo must move: shot lengths that are all alike, or acts that keep one pace, read as monotony.
+    Calm films are the exception: one shot per verse at about the same length is the look."""
     d = [((s.get("end") or 0) - (s.get("start") or 0)) / fps for s in shots if isinstance(s.get("end"), int)]
+    if calm:
+        return
     if len(d) >= 12:
         mean = sum(d) / len(d)
         cv = (sum((x - mean) ** 2 for x in d) / len(d)) ** 0.5 / mean if mean else 0
@@ -115,6 +125,7 @@ def main(path):
     if not shots:
         err("no shots")
         return report(film, errors, warnings)
+    calm = CALM or str(film.get("tempo") or "").strip().lower() == "calm"
     fps = float(film.get("fps", 24))
     runtime_s = (shots[-1].get("end") or 0) / fps
     roadmap = os.path.join(os.path.dirname(os.path.abspath(path)), "ROADMAP.md")
@@ -131,11 +142,12 @@ def main(path):
     for dup in sorted({i for i in ids if ids.count(i) > 1}):
         err(f"duplicate shot id {dup}")
     runtime = (shots[-1].get("end") or 0) / fps
-    lo, hi = max(4, round(runtime / 12)), max(8, round(runtime / 4))
+    lo, hi = (max(4, round(runtime / 20)), max(8, round(runtime / 4))) if calm else \
+             (max(4, round(runtime / 12)), max(8, round(runtime / 4)))
     if runtime and not lo <= len(shots) <= hi:
         warn(f"{len(shots)} shots for {runtime:.0f} s (average {runtime / len(shots):.1f} s); about {lo}-{hi} fit this length "
-             f"(an average of 4-12 s, references/craft.md §0)")
-    rhythm(shots, fps, warn)
+             f"(an average of {'7-20' if calm else '4-12'} s, references/craft.md §0)")
+    rhythm(shots, fps, warn, calm)
 
     framings, prev_end, vo_words = {}, None, 0
     for n, s in enumerate(shots):
@@ -169,8 +181,9 @@ def main(path):
             elif float(secs.group(1)) > dur + 0.5:
                 warn(f"{sid}: camera line lasts {secs.group(1)} s but the shot is {dur:.1f} s")
         if n == 0 and not (move.get("moving_at_start") is True or s.get("action_from_frame_1") is True):
-            err(f"{sid}: HOOK RULE: the first shot must move from frame 1 "
-                "(camera.move.moving_at_start: true, or action_from_frame_1: true)")
+            (warn if calm else err)(f"{sid}: HOOK RULE: the first shot must move from frame 1 "
+                "(camera.move.moving_at_start: true, or action_from_frame_1: true)"
+                + (" (calm: a slow open is allowed, say so on the card)" if calm else ""))
         elif n == 0 and s.get("action_from_frame_1") is not True:
             warn(f"{sid}: lead the hook with an action: the subject acts from frame 1 (action_from_frame_1: true)")
         if n == 0 and dur < 2.0 and len(shots) > 1:
@@ -191,7 +204,8 @@ def main(path):
 
         key = "|".join(str(x) for x in (s.get("location"), cam.get("size"), cam.get("lens_mm")))
         if key in framings and not (s.get("motif") and framings[key].get("motif")):
-            err(f"{sid}: repeats the framing of {framings[key].get('id')} [{key}]; change size or lens, or mark both motif: true")
+            (warn if calm else err)(f"{sid}: repeats the framing of {framings[key].get('id')} [{key}]; change size or lens, "
+                                    f"or mark both motif: true" + (" (calm: a returning framing is the look)" if calm else ""))
         framings.setdefault(key, s)
 
         for tx in s.get("text_on_screen") or []:
@@ -266,7 +280,9 @@ if __name__ == "__main__":
         sys.exit(subprocess.call([sys.executable] + sys.argv, env=dict(os.environ, PYTHONUTF8="1")))
     for _s in (sys.stdin, sys.stdout, sys.stderr):
         getattr(_s, "reconfigure", lambda **k: None)(encoding="utf-8", errors="replace")
-    if len(sys.argv) != 2 or sys.argv[1] in ("-h", "--help"):
+    CALM = "--calm" in sys.argv
+    argv = [a for a in sys.argv if a != "--calm"]
+    if len(argv) != 2 or argv[1] in ("-h", "--help"):
         print(__doc__)
-        sys.exit(0 if len(sys.argv) == 2 else 2)
-    sys.exit(main(sys.argv[1]))
+        sys.exit(0 if len(argv) == 2 else 2)
+    sys.exit(main(argv[1]))
